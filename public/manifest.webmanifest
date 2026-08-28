@@ -9,7 +9,7 @@
   "orientation": "portrait",
   "dir": "rtl",
   "lang": "ar",
-  "background_color": "#ecfdf5",
+  "background_color": "#065f46",
   "theme_color": "#047857",
   "prefer_related_applications": false,
   "icons": [
@@ -30,6 +30,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/splash.jpg",
+      "sizes": "1008x1792",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "نزلاوي NZLAWI"
     }
   ]
 }
