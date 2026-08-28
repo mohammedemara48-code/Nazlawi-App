@@ -4,7 +4,7 @@ function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "file";
 }
 
-function blobToken() {
+export function blobToken() {
   const named =
     process.env.BLOB_READ_WRITE_TOKEN ||
     process.env.VERCEL_BLOB_READ_WRITE_TOKEN ||
