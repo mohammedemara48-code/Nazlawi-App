@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LeafMark } from "./mark";
 import { Shell } from "./shell";
+import { InstallGate } from "./install-gate";
 import { registerNazlawiWorker } from "@/lib/nazlawi/push-client";
 
 export function NazlawiApp() {
@@ -31,6 +32,7 @@ export function NazlawiApp() {
   return (
     <div className="min-h-dvh bg-bg">
       {!liveUser ? <LoginScreen /> : <Shell />}
+      <InstallGate />
       {toast ? (
         <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <div className="rounded-full bg-ink px-4 py-2 text-sm text-primary-foreground shadow-lg">

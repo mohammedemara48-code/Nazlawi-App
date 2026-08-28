@@ -27,9 +27,12 @@ export const Route = createRootRoute({
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      { rel: "apple-touch-icon", href: "/icons/icon-192.png" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/icons/icon-32.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192.png" },
+      { rel: "apple-touch-icon", href: "/icons/icon-180.png" },
+      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "preload", href: "/__grok/manifest.webmanifest", as: "fetch" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
@@ -42,6 +45,7 @@ export const Route = createRootRoute({
         href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap",
       },
     ],
+    scripts: [{ src: "/install-boot.js" }],
   }),
   component: () => (
     <html lang="ar" dir="rtl" suppressHydrationWarning>

@@ -11,6 +11,7 @@
   "lang": "ar",
   "background_color": "#ecfdf5",
   "theme_color": "#047857",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",

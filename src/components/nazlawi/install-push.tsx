@@ -50,8 +50,10 @@ export function InstallAndNotifyCard() {
       await deferred.prompt();
       return;
     }
-    const platform = kind === "ios" ? "ios" : "android";
-    window.location.assign(`/?install=1&platform=${platform}`);
+    const boot = (window as Window & { __nazlawiInstall?: BeforeInstall }).__nazlawiInstall;
+    if (boot) {
+      await boot.prompt();
+    }
   }
 
   async function notify() {
