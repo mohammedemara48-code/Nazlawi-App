@@ -1,0 +1,169 @@
+{
+  "project": "nazlawi",
+  "locale": "ar-EG",
+  "collections": {
+    "users": {
+      "docId": "uid from Firebase Auth",
+      "fields": {
+        "name": "string",
+        "phone": "string",
+        "avatarUrl": "string?",
+        "role": "resident | merchant | driver | technician | doctor | admin",
+        "approved": "bool",
+        "subscribed": "bool",
+        "subscriptionExpiresAt": "timestamp?",
+        "neighborhood": "string?",
+        "friends": "array<string uid>",
+        "fcmToken": "string?",
+        "createdAt": "timestamp"
+      },
+      "example": {
+        "name": "أم يوسف",
+        "phone": "+201000000002",
+        "role": "merchant",
+        "approved": true,
+        "subscribed": true,
+        "neighborhood": "الحارة الكبيرة",
+        "friends": ["u1"],
+        "createdAt": "2026-02-04T10:00:00Z"
+      }
+    },
+    "posts": {
+      "docId": "autoId",
+      "fields": {
+        "authorId": "string",
+        "authorName": "string",
+        "authorAvatar": "string?",
+        "type": "photo | video | voice | text",
+        "caption": "string?",
+        "mediaUrl": "string?",
+        "thumbnailUrl": "string?",
+        "durationSec": "number",
+        "likes": "number",
+        "likedBy": "array<string uid>",
+        "createdAt": "timestamp"
+      }
+    },
+    "products": {
+      "docId": "autoId",
+      "fields": {
+        "merchantId": "string",
+        "merchantName": "string",
+        "title": "string",
+        "description": "string",
+        "price": "number",
+        "currency": "EGP",
+        "unit": "string",
+        "imageUrl": "string?",
+        "available": "bool",
+        "stock": "number",
+        "createdAt": "timestamp"
+      }
+    },
+    "reservations": {
+      "docId": "autoId",
+      "fields": {
+        "productId": "string",
+        "buyerId": "string",
+        "merchantId": "string",
+        "qty": "number",
+        "status": "pending | accepted | ready | cancelled",
+        "note": "string?",
+        "createdAt": "timestamp"
+      }
+    },
+    "deliveryAgents": {
+      "docId": "uid",
+      "fields": {
+        "name": "string",
+        "phone": "string",
+        "status": "available | busy | offline",
+        "vehicle": "string",
+        "rating": "number",
+        "updatedAt": "timestamp"
+      }
+    },
+    "deliveryJobs": {
+      "docId": "autoId",
+      "fields": {
+        "agentId": "string?",
+        "requesterId": "string",
+        "from": "string",
+        "to": "string",
+        "status": "open | accepted | delivered | cancelled",
+        "fee": "number?",
+        "createdAt": "timestamp"
+      }
+    },
+    "rides": {
+      "docId": "autoId",
+      "fields": {
+        "type": "toktok | taxi | truck",
+        "driverId": "string",
+        "driverName": "string",
+        "phone": "string",
+        "from": "string",
+        "to": "string",
+        "price": "number",
+        "when": "timestamp",
+        "available": "bool",
+        "bookedBy": "string?"
+      }
+    },
+    "carpools": {
+      "docId": "autoId",
+      "fields": {
+        "authorId": "string",
+        "authorName": "string",
+        "from": "string",
+        "to": "string",
+        "when": "timestamp",
+        "seats": "number",
+        "note": "string",
+        "passengers": "array<string uid>"
+      }
+    },
+    "services": {
+      "docId": "autoId",
+      "fields": {
+        "name": "string",
+        "specialty": "string",
+        "phone": "string",
+        "neighborhood": "string",
+        "rating": "number",
+        "available": "bool",
+        "ownerId": "string?"
+      }
+    },
+    "chats": {
+      "docId": "autoId",
+      "fields": {
+        "memberIds": "array<string uid>",
+        "isDirect": "bool",
+        "lastMessage": "string?",
+        "lastAt": "timestamp"
+      },
+      "subcollections": {
+        "messages": {
+          "fields": {
+            "senderId": "string",
+            "senderName": "string",
+            "text": "string?",
+            "audioUrl": "string?",
+            "audioDuration": "number",
+            "createdAt": "timestamp"
+          }
+        }
+      }
+    },
+    "adminMeta": {
+      "docId": "config",
+      "fields": {
+        "villageName": "النزل",
+        "appName": "نزلاوي",
+        "subscriptionPriceEGP": "number",
+        "requireApproval": "bool"
+      }
+    }
+  }
+}

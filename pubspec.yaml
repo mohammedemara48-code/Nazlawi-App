@@ -1,0 +1,50 @@
+name: nazlawi
+description: تطبيق نزلاوي — مجتمع قرية النزل
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  intl: ^0.19.0
+
+  # Firebase
+  firebase_core: ^3.8.1
+  firebase_auth: ^5.3.4
+  cloud_firestore: ^5.6.0
+  firebase_storage: ^12.3.7
+
+  # Media
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+  record: ^5.2.0
+  just_audio: ^0.9.42
+  audio_waveforms: ^1.2.0
+  image_picker: ^1.1.2
+  cached_network_image: ^3.4.1
+
+  # UI & utils
+  flutter_svg: ^2.0.16
+  timeago: ^3.7.0
+  uuid: ^4.5.1
+  permission_handler: ^11.3.1
+  geolocator: ^13.0.2
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
