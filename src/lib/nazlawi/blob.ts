@@ -4,6 +4,20 @@ function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "file";
 }
 
+function blobToken() {
+  const named =
+    process.env.BLOB_READ_WRITE_TOKEN ||
+    process.env.VERCEL_BLOB_READ_WRITE_TOKEN ||
+    process.env.NZLAWI_READ_WRITE_TOKEN ||
+    process.env.NAZLAWI_READ_WRITE_TOKEN ||
+    "";
+  if (named) return named;
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.endsWith("_READ_WRITE_TOKEN") && value) return value;
+  }
+  return "";
+}
+
 export const uploadMarketMedia = createServerFn({ method: "POST" })
   .validator((d: { filename: string; contentType: string; dataUrl: string }) => d)
   .handler(async ({ data }) => {
@@ -16,8 +30,7 @@ export const uploadMarketMedia = createServerFn({ method: "POST" })
     const buffer = Buffer.from(raw ?? "", "base64");
     if (!buffer.length) return { ok: false as const, url: "" };
 
-    const token =
-      process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN || "";
+    const token = blobToken();
     const storedName = `${Date.now()}-${safeName(filename)}`;
 
     if (token) {
