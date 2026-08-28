@@ -9,9 +9,7 @@ import {
   Menu,
   MessageCircle,
   Plus,
-  Search,
   Shield,
-  ShoppingBasket,
   Store,
   Truck,
   UserRound,
@@ -24,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { canEnter, canPublish, useNazlawi } from "@/lib/nazlawi/store";
 import type { ScreenId } from "@/lib/nazlawi/types";
 import { LeafMark } from "./mark";
+import { MarketScreen } from "./market";
 import { readAsDataUrl } from "./media";
 import {
   ChatScreen,
@@ -73,7 +72,7 @@ export function Shell() {
   const [compose, setCompose] = useState<ComposeKind | null>(null);
   const items = NAV.filter((n) => canEnter(role, n.id));
   const title = items.find((n) => n.id === screen)?.title ?? "نزلاوي";
-  const showFab = canPublish(role, screen);
+  const showFab = canPublish(role, screen) && screen !== "market";
 
   useEffect(() => {
     if (user && !canEnter(role, screen)) setScreen("timeline");
@@ -121,13 +120,11 @@ export function Shell() {
               setCompose(
                 screen === "timeline"
                   ? "post"
-                  : screen === "market"
-                    ? "product"
-                    : screen === "transport"
-                      ? "ride"
-                      : screen === "services"
-                        ? "service"
-                        : "carpool",
+                  : screen === "transport"
+                    ? "ride"
+                    : screen === "services"
+                      ? "service"
+                      : "carpool",
               )
             }
           >
@@ -311,45 +308,6 @@ function ComposeSheet({ kind, onClose }: { kind: ComposeKind; onClose: () => voi
           <Button type="submit">حفظ</Button>
         </form>
       </Card>
-    </div>
-  );
-}
-
-function MarketScreen() {
-  const products = useNazlawi((s) => s.products);
-  const reserveProduct = useNazlawi((s) => s.reserveProduct);
-  const commentProduct = useNazlawi((s) => s.commentProduct);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-3 right-3 size-4 text-muted-foreground" />
-        <Input className="pr-9" placeholder="ابحث…" />
-      </div>
-      {products.map((p) => (
-        <Card key={p.id} className="p-3">
-          <div className="flex items-center gap-3">
-            {p.photo ? (
-              <img src={p.photo} alt="" className="size-16 rounded-lg object-cover" />
-            ) : (
-              <div className="flex size-16 items-center justify-center rounded-lg bg-sand text-primary">
-                <ShoppingBasket className="size-6" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="font-extrabold">{p.title}</p>
-              <p className="text-xs text-muted-foreground">{p.merchantName}</p>
-              <p className="text-sm">{p.description}</p>
-              <p className="font-extrabold text-primary">
-                {p.price} ج · {p.unit}
-              </p>
-            </div>
-            <Button size="sm" onClick={() => reserveProduct(p.title)}>
-              حجز
-            </Button>
-          </div>
-          <CommentBox items={p.comments} onSend={(t) => commentProduct(p.id, t)} />
-        </Card>
-      ))}
     </div>
   );
 }

@@ -46,29 +46,20 @@ export function isAdminPhone(phone: string) {
 }
 
 export function canEnter(role: UserRole, screen: ScreenId) {
-  if (role === "admin") return true;
-  if (role === "merchant") return screen !== "admin";
-  return (
-    screen === "profile" ||
-    screen === "timeline" ||
-    screen === "carpool" ||
-    screen === "people" ||
-    screen === "chat"
-  );
+  if (screen === "admin") return role === "admin";
+  return true;
 }
 
 export function canPublish(role: UserRole, screen: ScreenId) {
-  if (role === "admin" || role === "merchant") {
-    return (
-      screen === "timeline" ||
-      screen === "market" ||
-      screen === "delivery" ||
-      screen === "transport" ||
-      screen === "carpool" ||
-      screen === "services"
-    );
-  }
-  return screen === "timeline" || screen === "carpool";
+  if (role !== "admin" && role !== "merchant") return false;
+  return (
+    screen === "timeline" ||
+    screen === "market" ||
+    screen === "delivery" ||
+    screen === "transport" ||
+    screen === "carpool" ||
+    screen === "services"
+  );
 }
 
 function threadOf(a: string, b: string) {
@@ -101,10 +92,12 @@ type NazlawiState = {
   screen: ScreenId;
   memberId: string | null;
   chatWith: string | null;
+  shopId: string | null;
   toast: string | null;
   setScreen: (s: ScreenId) => void;
   openMember: (id: string) => void;
   openChat: (id: string) => void;
+  setShopId: (id: string | null) => void;
   login: (name: string, phone: string, password: string, role: AccountRole) => void;
   logout: () => void;
   updateMe: (patch: Partial<VillageUser>) => void;
@@ -144,10 +137,12 @@ export const useNazlawi = create<NazlawiState>()(
       screen: "timeline",
       memberId: null,
       chatWith: null,
+      shopId: null,
       toast: null,
-      setScreen: (screen) => set({ screen, memberId: null }),
+      setScreen: (screen) => set({ screen, memberId: null, shopId: null }),
       openMember: (id) => set({ screen: "people", memberId: id }),
       openChat: (id) => set({ screen: "chat", chatWith: id, memberId: null }),
+      setShopId: (shopId) => set({ shopId, screen: "market" }),
       login: (name, phone, password, role) => {
         const pass = password.trim();
         const normalized = normalizePhone(phone);

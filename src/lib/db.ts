@@ -194,6 +194,8 @@ export function getSql(): Promise<Sql> {
   return sqlPromise;
 }
 
+// Keep HMR applying newly added migrations/*.sql on the shared PGLite instance.
+
 /**
  * The shared PGLite instance (preview only), with `migrations/*.sql` applied.
  * Lets Better Auth persist to the SAME embedded DB as app data in preview (via a
