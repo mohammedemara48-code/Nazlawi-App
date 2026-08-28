@@ -10,6 +10,7 @@ import type {
   ScreenId,
   ServicePro,
   TimelinePost,
+  UserRole,
   VillageUser,
 } from "./types";
 
@@ -26,7 +27,7 @@ const seedUsers: VillageUser[] = [
     role: "admin",
     approved: true,
     subscribed: true,
-    neighborhood: "نزلة البحر",
+    neighborhood: "النزل",
     createdAt: "2026-01-10T10:00:00.000Z",
   },
   {
@@ -36,7 +37,7 @@ const seedUsers: VillageUser[] = [
     role: "merchant",
     approved: true,
     subscribed: true,
-    neighborhood: "الحارة الكبيرة",
+    neighborhood: "النزل",
     createdAt: "2026-02-04T10:00:00.000Z",
   },
   {
@@ -46,7 +47,7 @@ const seedUsers: VillageUser[] = [
     role: "driver",
     approved: true,
     subscribed: true,
-    neighborhood: "المحطة",
+    neighborhood: "النزل",
     createdAt: "2026-03-12T10:00:00.000Z",
   },
 ];
@@ -252,7 +253,7 @@ function normalizePhone(raw: string) {
   return p;
 }
 
-export const DEMO_OTP = "123456";
+type AccountRole = Extract<UserRole, "resident" | "merchant">;
 
 type NazlawiState = {
   hydrated: boolean;
@@ -266,14 +267,10 @@ type NazlawiState = {
   messages: ChatMessage[];
   currentUser: VillageUser | null;
   screen: ScreenId;
-  pendingName: string;
-  pendingPhone: string;
-  pendingHood: string;
   toast: string | null;
   setHydrated: () => void;
   setScreen: (s: ScreenId) => void;
-  startLogin: (name: string, phone: string, hood: string) => void;
-  confirmOtp: (code: string) => string | null;
+  login: (name: string, phone: string, role: AccountRole) => void;
   logout: () => void;
   approveUser: (id: string, approved: boolean) => void;
   setSubscribed: (id: string, value: boolean) => void;
@@ -302,46 +299,33 @@ export const useNazlawi = create<NazlawiState>()(
       messages: seedMessages,
       currentUser: null,
       screen: "timeline",
-      pendingName: "",
-      pendingPhone: "",
-      pendingHood: "",
       toast: null,
       setHydrated: () => set({ hydrated: true }),
       setScreen: (screen) => set({ screen }),
-      startLogin: (name, phone, hood) =>
-        set({
-          pendingName: name.trim(),
-          pendingPhone: normalizePhone(phone),
-          pendingHood: hood.trim() || "النزل",
-        }),
-      confirmOtp: (code) => {
-        if (code.trim() !== DEMO_OTP) return "الكود التجريبي هو 123456";
-        const phone = get().pendingPhone;
-        const name = get().pendingName || "نزلاوي";
-        const hood = get().pendingHood || "النزل";
+      login: (name, phone, role) => {
+        const nazlawiName = name.trim();
+        const normalized = normalizePhone(phone);
+        if (!nazlawiName || !normalized) return;
         const existing = get().users.find(
-          (u) => u.phone.replace(/\D/g, "") === phone.replace(/\D/g, ""),
+          (u) => u.phone.replace(/\D/g, "") === normalized.replace(/\D/g, ""),
         );
-        const isAdmin =
-          phone.endsWith("0001") ||
-          existing?.role === "admin" ||
-          name.includes("أحمد عبدالسلام");
+        const isAdmin = normalized.endsWith("0001") || existing?.role === "admin";
+        const nextRole: UserRole = isAdmin ? "admin" : role;
         const user: VillageUser = existing
           ? {
               ...existing,
-              name: name || existing.name,
-              neighborhood: hood || existing.neighborhood,
-              approved: isAdmin ? true : existing.approved,
-              role: isAdmin ? "admin" : existing.role,
+              name: nazlawiName || existing.name,
+              role: isAdmin ? "admin" : role,
+              approved: true,
             }
           : {
               id: nid(),
-              name,
-              phone,
-              role: isAdmin ? "admin" : "resident",
-              approved: isAdmin,
-              subscribed: isAdmin,
-              neighborhood: hood,
+              name: nazlawiName,
+              phone: normalized,
+              role: nextRole,
+              approved: true,
+              subscribed: nextRole === "admin" || role === "merchant",
+              neighborhood: "النزل",
               createdAt: new Date().toISOString(),
             };
         set((s) => ({
@@ -349,18 +333,10 @@ export const useNazlawi = create<NazlawiState>()(
           users: existing
             ? s.users.map((u) => (u.id === user.id ? user : u))
             : [...s.users, user],
-          screen: "timeline",
+          screen: nextRole === "merchant" ? "market" : "timeline",
         }));
-        return null;
       },
-      logout: () =>
-        set({
-          currentUser: null,
-          pendingName: "",
-          pendingPhone: "",
-          pendingHood: "",
-          screen: "timeline",
-        }),
+      logout: () => set({ currentUser: null, screen: "timeline" }),
       approveUser: (id, approved) =>
         set((s) => ({
           users: s.users.map((u) => (u.id === id ? { ...u, approved } : u)),
@@ -371,9 +347,11 @@ export const useNazlawi = create<NazlawiState>()(
         })),
       setSubscribed: (id, value) =>
         set((s) => ({
-          users: s.users.map((u) =>
-            u.id === id ? { ...u, subscribed: value } : u,
-          ),
+          users: s.users.map((u) => (u.id === id ? { ...u, subscribed: value } : u)),
+          currentUser:
+            s.currentUser?.id === id
+              ? { ...s.currentUser, subscribed: value }
+              : s.currentUser,
         })),
       addPost: (caption, type) => {
         const me = get().currentUser;
@@ -384,72 +362,64 @@ export const useNazlawi = create<NazlawiState>()(
           authorName: me.name,
           type,
           caption: caption.trim() || undefined,
-          durationSec: type === "voice" ? 8 : type === "video" ? 15 : 0,
+          durationSec: type === "voice" ? 8 : type === "video" ? 12 : 0,
           likes: 0,
           createdAt: new Date().toISOString(),
         };
-        set((s) => ({ posts: [post, ...s.posts], toast: "تم نشر المنشور" }));
+        set((s) => ({ posts: [post, ...s.posts], toast: "تم" }));
       },
       likePost: (id) =>
         set((s) => ({
-          posts: s.posts.map((p) =>
-            p.id === id ? { ...p, likes: p.likes + 1 } : p,
-          ),
+          posts: s.posts.map((p) => (p.id === id ? { ...p, likes: p.likes + 1 } : p)),
         })),
       addProduct: (title, description, price) => {
         const me = get().currentUser;
-        if (!me || !title.trim()) return;
+        if (!me) return;
         const product: Product = {
           id: nid(),
           merchantId: me.id,
           merchantName: me.name,
           title: title.trim(),
           description: description.trim(),
-          price,
+          price: Number.isFinite(price) ? price : 0,
           unit: "قطعة",
         };
-        set((s) => ({
-          products: [product, ...s.products],
-          toast: "اتضاف المنتج لسوق النزل",
-        }));
+        set((s) => ({ products: [product, ...s.products], toast: "تم" }));
       },
-      reserveProduct: (title) =>
-        set({ toast: `تم حجز «${title}» من التاجر` }),
+      reserveProduct: (title) => set({ toast: `تم حجز «${title}»` }),
       setMyDelivery: (status) => {
         const me = get().currentUser;
         if (!me) return;
         set((s) => {
-          const i = s.agents.findIndex((a) => a.id === me.id);
-          const agent: DeliveryAgent = {
-            id: me.id,
-            name: me.name,
-            phone: me.phone,
-            status,
-            vehicle: "موتوسيكل",
-            rating: 5,
-          };
-          const agents =
-            i >= 0
-              ? s.agents.map((a, idx) => (idx === i ? agent : a))
-              : [agent, ...s.agents];
+          const exists = s.agents.some((a) => a.id === me.id);
+          const agents = exists
+            ? s.agents.map((a) => (a.id === me.id ? { ...a, status } : a))
+            : [
+                {
+                  id: me.id,
+                  name: me.name,
+                  phone: me.phone,
+                  status,
+                  vehicle: "موتوسيكل",
+                  rating: 5,
+                },
+                ...s.agents,
+              ];
           return { agents };
         });
       },
       addCarpool: (from, to, seats, note) => {
         const me = get().currentUser;
-        if (!me || !to.trim()) return;
-        const post: CarpoolPost = {
+        if (!me) return;
+        const item: CarpoolPost = {
           id: nid(),
           authorName: me.name,
           from: from.trim() || "النزل",
           to: to.trim(),
-          seats,
+          seats: seats || 1,
           note: note.trim(),
         };
-        set((s) => ({
-          carpools: [post, ...s.carpools],
-          toast: "اتنشر المشوار",
-        }));
+        set((s) => ({ carpools: [item, ...s.carpools], toast: "تم" }));
       },
       sendMessage: (text, voice) => {
         const me = get().currentUser;
@@ -469,7 +439,7 @@ export const useNazlawi = create<NazlawiState>()(
       setToast: (msg) => set({ toast: msg }),
     }),
     {
-      name: "nazlawi-village",
+      name: "nazlawi-v2",
       skipHydration: true,
       partialize: (s) => ({
         users: s.users,

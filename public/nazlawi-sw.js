@@ -1,5 +1,34 @@
+const CACHE = "nazlawi-v2";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+    ).then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        if (res.ok && event.request.url.startsWith(self.location.origin)) {
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request).then((hit) => hit || caches.match("/"))),
+  );
+});
+
 self.addEventListener("push", (event) => {
-  let payload = { title: "نزلاوي", body: "إشعار من قرية النزل", url: "/" };
+  let payload = { title: "نزلاوي", body: "إشعار من نزلاوي", url: "/" };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch {
@@ -12,11 +41,11 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || "نزلاوي", {
       body: payload.body || "",
-      icon: "/__grok/icon-180.png",
-      badge: "/__grok/icon-180.png",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       dir: "rtl",
       lang: "ar",
-      tag: "nazlawi-village",
+      tag: "nazlawi",
       renotify: true,
       data: { url: payload.url || "/" },
     }),

@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { DEMO_OTP, useNazlawi } from "@/lib/nazlawi/store";
+import { useEffect, useState } from "react";
+import { Store, UserRound } from "lucide-react";
+import { useNazlawi } from "@/lib/nazlawi/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { LeafMark } from "./mark";
 import { Shell } from "./shell";
 import { registerNazlawiWorker } from "@/lib/nazlawi/push-client";
@@ -30,13 +30,7 @@ export function NazlawiApp() {
 
   return (
     <div className="min-h-dvh bg-bg">
-      {!liveUser ? (
-        <LoginScreen />
-      ) : !liveUser.approved ? (
-        <PendingScreen />
-      ) : (
-        <Shell />
-      )}
+      {!liveUser ? <LoginScreen /> : <Shell />}
       {toast ? (
         <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <div className="rounded-full bg-ink px-4 py-2 text-sm text-primary-foreground shadow-lg">
@@ -49,38 +43,54 @@ export function NazlawiApp() {
 }
 
 function LoginScreen() {
-  const startLogin = useNazlawi((s) => s.startLogin);
-  const confirmOtp = useNazlawi((s) => s.confirmOtp);
-  const pendingPhone = useNazlawi((s) => s.pendingPhone);
+  const login = useNazlawi((s) => s.login);
+  const [role, setRole] = useState<"resident" | "merchant">("resident");
 
-  return pendingPhone ? (
-    <OtpForm onConfirm={confirmOtp} phone={pendingPhone} />
-  ) : (
-    <section className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
+  return (
+    <section className="mx-auto flex min-h-dvh max-w-md flex-col px-6 pb-8 pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="mb-8 flex size-16 items-center justify-center rounded-2xl bg-secondary text-primary">
         <LeafMark />
       </div>
       <h1 className="text-3xl font-extrabold tracking-tight">نزلاوي</h1>
-      <p className="mt-1 text-muted-foreground">دخول قرية النزل برقم الموبايل</p>
+
+      <div className="mt-8 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setRole("resident")}
+          className={`flex flex-col items-center gap-2 rounded-2xl border-2 px-3 py-5 ${
+            role === "resident"
+              ? "border-primary bg-secondary text-secondary-foreground"
+              : "border-border bg-card"
+          }`}
+        >
+          <UserRound className="size-7" />
+          <span className="font-extrabold">حساب نزلاوي</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setRole("merchant")}
+          className={`flex flex-col items-center gap-2 rounded-2xl border-2 px-3 py-5 ${
+            role === "merchant"
+              ? "border-primary bg-secondary text-secondary-foreground"
+              : "border-border bg-card"
+          }`}
+        >
+          <Store className="size-7" />
+          <span className="font-extrabold">حساب تاجر</span>
+        </button>
+      </div>
+
       <form
-        className="mt-8 flex flex-col gap-3"
+        className="mt-8 flex flex-1 flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
-          startLogin(
-            String(fd.get("name") ?? ""),
-            String(fd.get("phone") ?? ""),
-            String(fd.get("hood") ?? ""),
-          );
+          login(String(fd.get("name") ?? ""), String(fd.get("phone") ?? ""), role);
         }}
       >
         <label className="text-sm font-medium">
-          الاسم
-          <Input name="name" required className="mt-1" placeholder="اسمك في القرية" />
-        </label>
-        <label className="text-sm font-medium">
-          الحارة / النزلة
-          <Input name="hood" className="mt-1" placeholder="نزلة البحر" />
+          اسم النزلاوي
+          <Input name="name" required className="mt-1" autoComplete="name" />
         </label>
         <label className="text-sm font-medium">
           رقم الموبايل
@@ -89,75 +99,13 @@ function LoginScreen() {
             required
             inputMode="tel"
             className="mt-1"
-            placeholder="01xxxxxxxxx"
+            autoComplete="tel"
           />
         </label>
-        <Button type="submit" size="lg" className="mt-2 w-full">
-          إرسال كود التحقق
+        <Button type="submit" size="lg" className="mt-auto w-full">
+          دخول
         </Button>
       </form>
-      <p className="mt-6 text-center text-xs leading-6 text-muted-foreground">
-        الكود التجريبي {DEMO_OTP}. رقم ينتهي بـ 0001 يدخل كأدمن موافق عليه.
-      </p>
-    </section>
-  );
-}
-
-function OtpForm({
-  phone,
-  onConfirm,
-}: {
-  phone: string;
-  onConfirm: (code: string) => string | null;
-}) {
-  return (
-    <section className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
-      <h1 className="text-2xl font-extrabold">كود التحقق</h1>
-      <p className="mt-1 text-muted-foreground">اتبعت الكود على {phone}</p>
-      <form
-        className="mt-8 flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          const err = onConfirm(String(fd.get("code") ?? ""));
-          if (err) window.alert(err);
-        }}
-      >
-        <Input
-          name="code"
-          inputMode="numeric"
-          maxLength={6}
-          required
-          className="h-14 text-center text-2xl tracking-[0.4em]"
-          placeholder="••••••"
-        />
-        <Button type="submit" size="lg">
-          تأكيد الدخول
-        </Button>
-      </form>
-    </section>
-  );
-}
-
-function PendingScreen() {
-  const user = useNazlawi((s) => s.currentUser);
-  const logout = useNazlawi((s) => s.logout);
-  return (
-    <section className="mx-auto flex min-h-dvh max-w-md flex-col items-center px-6 py-16 text-center">
-      <div className="flex size-20 items-center justify-center rounded-full bg-sand text-primary">
-        <LeafMark />
-      </div>
-      <h1 className="mt-6 text-2xl font-extrabold">أهلاً {user?.name}</h1>
-      <p className="mt-3 max-w-sm leading-7 text-muted-foreground">
-        طلبك واصل لإدارة نزلاوي. هتقدر تدخل قريتي والسوق بعد موافقة الأدمن.
-      </p>
-      <Card className="mt-8 w-full p-4 text-right">
-        <p className="font-semibold">{user?.phone}</p>
-        <p className="text-sm text-muted-foreground">{user?.neighborhood}</p>
-      </Card>
-      <Button variant="outline" className="mt-auto w-full" onClick={logout}>
-        تسجيل الخروج
-      </Button>
     </section>
   );
 }

@@ -31,16 +31,16 @@ import { enableVillagePush } from "@/lib/nazlawi/push-client";
 import { useNazlawi } from "@/lib/nazlawi/store";
 import type { ScreenId } from "@/lib/nazlawi/types";
 
-const NAV: { id: ScreenId; title: string; subtitle: string; admin?: boolean }[] = [
-  { id: "profile", title: "حسابي وإعداداتي", subtitle: "نزلاوي" },
-  { id: "timeline", title: "قريتي", subtitle: "صور · فيديو قصير · صوتيات" },
-  { id: "market", title: "سوق النزل", subtitle: "محلات وحجز منتجات" },
-  { id: "delivery", title: "توصيل نزلاوي", subtitle: "مندوبين وحالة التوفر" },
-  { id: "transport", title: "مواقف ونقل", subtitle: "توك توك · تاكسي · نقل" },
-  { id: "carpool", title: "خدني معاك", subtitle: "مواصلات مشتركة" },
-  { id: "services", title: "دليل الخدمات", subtitle: "فنيين وأطباء القرية" },
-  { id: "chat", title: "محادثة خاصة", subtitle: "رسائل وصوتيات للأصدقاء" },
-  { id: "admin", title: "لوحة الإدارة", subtitle: "اشتراكات وموافقة الأعضاء", admin: true },
+const NAV: { id: ScreenId; title: string; admin?: boolean }[] = [
+  { id: "profile", title: "حسابي" },
+  { id: "timeline", title: "قريتي" },
+  { id: "market", title: "سوق النزل" },
+  { id: "delivery", title: "توصيل نزلاوي" },
+  { id: "transport", title: "مواقف ونقل" },
+  { id: "carpool", title: "خدني معاك" },
+  { id: "services", title: "دليل الخدمات" },
+  { id: "chat", title: "محادثة خاصة" },
+  { id: "admin", title: "لوحة الإدارة", admin: true },
 ];
 
 const ICONS: Record<ScreenId, typeof UserRound> = {
@@ -74,7 +74,6 @@ export function Shell() {
         </Button>
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate font-extrabold">{title}</p>
-          <p className="text-xs text-muted-foreground">نزلاوي · النزل</p>
         </div>
         <Button
           variant="ghost"
@@ -82,7 +81,7 @@ export function Shell() {
           aria-label="إشعارات"
           onClick={() => {
             void enableVillagePush().then((result) =>
-              setToast(result === "ok" ? "الإشعارات مفعّلة حتى والتطبيق مقفول" : result),
+              setToast(result === "ok" ? "تم" : result),
             );
           }}
         >
@@ -131,7 +130,7 @@ export function Shell() {
                 <LeafMark />
               </div>
               <p className="text-xl font-extrabold">نزلاوي</p>
-              <p className="text-sm text-primary-foreground/80">قرية النزل · مجتمع واحد</p>
+              {user?.name ? <p className="text-sm text-primary-foreground/80">{user.name}</p> : null}
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
               {NAV.filter((n) => !n.admin || isAdmin).map((item) => {
@@ -151,9 +150,6 @@ export function Shell() {
                     <Icon className="size-5 shrink-0" />
                     <span className="min-w-0">
                       <span className="block font-bold">{item.title}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {item.subtitle}
-                      </span>
                     </span>
                   </button>
                 );
@@ -192,7 +188,7 @@ function ComposeSheet({
       <Card className="w-full max-w-md p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-extrabold">
-            {kind === "post" ? "منشور لأهل النزل" : kind === "product" ? "منتج لسوق النزل" : "خدني معاك"}
+            {kind === "post" ? "منشور" : kind === "product" ? "منتج" : "خدني معاك"}
           </h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="إغلاق">
             <X className="size-4" />
@@ -221,7 +217,7 @@ function ComposeSheet({
           }}
         >
           {kind === "post" && (
-            <Input name="caption" placeholder="اكتب لأهل القرية…" />
+            <Input name="caption" placeholder="اكتب…" />
           )}
           {kind === "product" && (
             <>
@@ -254,7 +250,7 @@ function ProfileScreen() {
     driver: "سائق",
     technician: "فني",
     doctor: "طبيب",
-    resident: "ساكن",
+    resident: "نزلاوي",
   };
   return (
     <div className="flex flex-col items-center gap-3">
@@ -262,13 +258,9 @@ function ProfileScreen() {
         <UserRound className="size-10" />
       </div>
       <h2 className="text-xl font-extrabold">{user?.name}</h2>
-      <p className="text-sm text-muted-foreground">
-        {user?.neighborhood} · {user?.subscribed ? "مشترك" : "غير مشترك"}
-      </p>
       <Card className="mt-4 w-full divide-y divide-border">
         <Row label="رقم الموبايل" value={user?.phone} />
-        <Row label="الدور" value={roleAr[user?.role ?? "resident"]} />
-        <Row label="حالة الحساب" value={user?.approved ? "موافق عليه من إدارة القرية" : "معلّق"} />
+        <Row label="الحساب" value={roleAr[user?.role ?? "resident"]} />
       </Card>
       <InstallAndNotifyCard />
       <Button variant="outline" className="mt-4 w-full" onClick={logout}>
@@ -411,12 +403,7 @@ function DeliveryScreen() {
   return (
     <div className="flex flex-col gap-3">
       <Card className="flex items-center justify-between bg-secondary p-4">
-        <div>
-          <p className="font-extrabold">أنا متاح للتوصيل</p>
-          <p className="text-sm text-secondary-foreground">
-            {on ? "ظاهر للمناديب الآن" : "غير ظاهر"}
-          </p>
-        </div>
+        <p className="font-extrabold">أنا متاح للتوصيل</p>
         <button
           className={`h-7 w-12 rounded-full ${on ? "bg-primary" : "bg-border"}`}
           onClick={() => setMyDelivery(on ? "offline" : "available")}
@@ -483,10 +470,6 @@ function CarpoolScreen() {
   const carpools = useNazlawi((s) => s.carpools);
   return (
     <div className="flex flex-col gap-3">
-      <Card className="bg-secondary p-4">
-        <p className="font-extrabold text-secondary-foreground">خدني معاك بين أهل القرية</p>
-        <p className="text-sm">انشر مشوارك أو احجز مقعد فاضي</p>
-      </Card>
       {carpools.map((c) => (
         <Card key={c.id} className="p-4">
           <p className="font-extrabold">
@@ -564,7 +547,7 @@ function ChatScreen() {
         >
           <Mic className="size-5 text-primary" />
         </Button>
-        <Input name="text" placeholder="رسالة للأصدقاء فقط…" />
+        <Input name="text" placeholder="رسالة" />
         <Button type="submit" size="icon" aria-label="إرسال">
           <Send className="size-4" />
         </Button>

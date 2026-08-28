@@ -33,16 +33,16 @@ export async function registerNazlawiWorker() {
 export async function enableVillagePush(): Promise<string> {
   if (typeof window === "undefined") return "غير متاح";
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    return "المتصفح لا يدعم الإشعارات الخلفية";
+    return "غير مدعوم";
   }
   if (deviceKind() === "ios" && !isStandalone()) {
-    return "على الآيفون: ثبّت نزلاوي على الشاشة الرئيسية أولاً ثم فعّل الإشعارات";
+    return "ثبّت نزلاوي أولاً";
   }
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return "تم رفض الإذن";
+  if (permission !== "granted") return "مرفوض";
 
   const reg = (await navigator.serviceWorker.getRegistration("/")) ?? (await registerNazlawiWorker());
-  if (!reg) return "تعذر تسجيل خدمة الإشعارات";
+  if (!reg) return "تعذر";
   await navigator.serviceWorker.ready;
 
   const sub = await reg.pushManager.subscribe({
@@ -54,6 +54,6 @@ export async function enableVillagePush(): Promise<string> {
   const p256dh = json.keys?.p256dh ?? "";
   const auth = json.keys?.auth ?? "";
   const saved = await savePushSubscription({ data: { endpoint, p256dh, auth } });
-  if (!saved.ok) return "تعذر حفظ الاشتراك";
+  if (!saved.ok) return "تعذر";
   return "ok";
 }
