@@ -21,32 +21,43 @@ function blobToken() {
 export const uploadMarketMedia = createServerFn({ method: "POST" })
   .validator((d: { filename: string; contentType: string; dataUrl: string }) => d)
   .handler(async ({ data }) => {
-    const filename = String(data.filename ?? "photo.jpg").slice(0, 120);
-    const contentType = String(data.contentType ?? "image/jpeg").slice(0, 80);
-    const dataUrl = String(data.dataUrl ?? "");
-    if (!dataUrl.startsWith("data:")) return { ok: false as const, url: "" };
+    try {
+      const filename = String(data.filename ?? "photo.jpg").slice(0, 120);
+      const dataUrl = String(data.dataUrl ?? "");
+      if (!dataUrl.startsWith("data:")) return { ok: false as const, url: "", error: "file" };
 
-    const raw = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
-    const buffer = Buffer.from(raw ?? "", "base64");
-    if (!buffer.length) return { ok: false as const, url: "" };
+      const raw = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+      const buffer = Buffer.from(raw ?? "", "base64");
+      if (!buffer.length) return { ok: false as const, url: "", error: "empty" };
 
-    const token = blobToken();
-    const storedName = `${Date.now()}-${safeName(filename)}`;
+      const token = blobToken();
+      const storedName = `${Date.now()}-${safeName(filename)}.jpg`;
 
-    if (token) {
-      const { put } = await import("@vercel/blob");
-      const stored = await put(`nazlawi/${storedName}`, buffer, {
-        access: "public",
-        token,
-        contentType: contentType || "application/octet-stream",
-      });
-      return { ok: true as const, url: stored.url };
+      if (token) {
+        const { put } = await import("@vercel/blob");
+        const stored = await put(`nazlawi/${storedName}`, buffer, {
+          access: "public",
+          token,
+          contentType: "image/jpeg",
+        });
+        return { ok: true as const, url: stored.url };
+      }
+
+      if (process.env.VERCEL) {
+        return { ok: false as const, url: "", error: "blob" };
+      }
+
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      const path = await import("node:path");
+      const dir = path.join(process.cwd(), "public", "uploads");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, storedName), buffer);
+      return { ok: true as const, url: `/uploads/${storedName}` };
+    } catch (err) {
+      return {
+        ok: false as const,
+        url: "",
+        error: err instanceof Error ? err.message : "fail",
+      };
     }
-
-    const { mkdir, writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const dir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, storedName), buffer);
-    return { ok: true as const, url: `/uploads/${storedName}` };
   });

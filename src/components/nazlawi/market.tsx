@@ -23,7 +23,7 @@ import {
   type ShopRow,
 } from "@/lib/nazlawi/market-fns";
 import { useNazlawi } from "@/lib/nazlawi/store";
-import { readAsDataUrl } from "./media";
+import { compressImage } from "./media";
 
 export function MarketScreen() {
   const me = useNazlawi((s) => s.currentUser);
@@ -349,12 +349,20 @@ function MerchantTools({
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              const dataUrl = await readAsDataUrl(file);
-              const up = await uploadMarketMedia({
-                data: { filename: file.name, contentType: file.type, dataUrl },
-              });
-              if (up.ok) setPhoto(up.url);
-              else setToast("التخزين مش جاهز");
+              try {
+                const dataUrl = await compressImage(file);
+                const up = await uploadMarketMedia({
+                  data: {
+                    filename: file.name.replace(/\.[^.]+$/, "") + ".jpg",
+                    contentType: "image/jpeg",
+                    dataUrl,
+                  },
+                });
+                if (up.ok) setPhoto(up.url);
+                else setToast(up.error ?? "التخزين مش جاهز");
+              } catch {
+                setToast("تعذر رفع الصورة");
+              }
             }}
           />
           <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>
