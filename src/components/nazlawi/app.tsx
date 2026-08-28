@@ -27,6 +27,14 @@ export function NazlawiApp() {
     ? (users.find((u) => u.id === currentUser.id) ?? currentUser)
     : null;
 
+  if (liveUser?.banned) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-bg px-6">
+        <p className="font-extrabold">الحساب محظور</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-bg">
       {!liveUser ? <LoginScreen /> : <Shell />}
@@ -62,9 +70,10 @@ function LoginScreen() {
         alt=""
         className="absolute inset-0 size-full object-cover object-center"
       />
-      <div className="absolute inset-0 bg-ink/50" />
+      <div className="absolute inset-0 bg-ink/55" />
       <div className="relative z-10 flex min-h-dvh flex-col px-6 pb-8 pt-[max(2.5rem,env(safe-area-inset-top))] text-primary-foreground">
-        <h1 className="text-4xl font-extrabold tracking-tight drop-shadow">نزلاوي</h1>
+        <p className="text-sm tracking-[0.35em]">NZLAWI</p>
+        <h1 className="text-4xl font-extrabold tracking-tight">نزلاوي</h1>
 
         <div className="mt-8 grid grid-cols-2 gap-3">
           <button
@@ -77,7 +86,7 @@ function LoginScreen() {
             }`}
           >
             <UserRound className="size-7" />
-            <span className="font-extrabold">حساب نزلاوي</span>
+            <span className="font-extrabold">نزلاوي</span>
           </button>
           <button
             type="button"
@@ -89,7 +98,7 @@ function LoginScreen() {
             }`}
           >
             <Store className="size-7" />
-            <span className="font-extrabold">حساب تاجر</span>
+            <span className="font-extrabold">تاجر</span>
           </button>
         </div>
 
@@ -98,11 +107,16 @@ function LoginScreen() {
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
-            login(String(fd.get("name") ?? ""), String(fd.get("phone") ?? ""), role);
+            login(
+              String(fd.get("name") ?? ""),
+              String(fd.get("phone") ?? ""),
+              String(fd.get("password") ?? ""),
+              role,
+            );
           }}
         >
           <label className="text-sm font-medium">
-            اسم النزلاوي
+            الاسم
             <Input
               name="name"
               required
@@ -111,13 +125,24 @@ function LoginScreen() {
             />
           </label>
           <label className="text-sm font-medium">
-            رقم الموبايل
+            رقم الجوال
             <Input
               name="phone"
               required
               inputMode="tel"
               className="mt-1 border-0 bg-primary-foreground text-fg"
               autoComplete="tel"
+            />
+          </label>
+          <label className="text-sm font-medium">
+            كلمة السر
+            <Input
+              name="password"
+              type="password"
+              required
+              minLength={4}
+              className="mt-1 border-0 bg-primary-foreground text-fg"
+              autoComplete="current-password"
             />
           </label>
           <div className="mt-auto flex flex-col gap-2">

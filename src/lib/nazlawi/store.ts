@@ -3,8 +3,10 @@ import { persist } from "zustand/middleware";
 import type {
   CarpoolPost,
   ChatMessage,
+  Comment,
   DeliveryAgent,
   DeliveryStatus,
+  FriendLink,
   Product,
   RideOffer,
   ScreenId,
@@ -14,24 +16,78 @@ import type {
   VillageUser,
 } from "./types";
 
+export const ADMIN_NAME = "Mohamed Mahmoud Emara";
+export const ADMIN_DIGITS = "966554937560";
+
 const nid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-function normalizePhone(raw: string) {
-  let p = raw.replace(/[\s-]/g, "");
-  if (p.startsWith("00")) p = `+${p.slice(2)}`;
-  if (p.startsWith("01") && p.length === 11) p = `+2${p}`;
-  if (p.startsWith("1") && p.length === 10) p = `+20${p}`;
-  if (!p.startsWith("+")) p = `+20${p}`;
-  return p;
+export function digits(raw: string) {
+  return raw.replace(/\D/g, "");
+}
+
+export function normalizePhone(raw: string) {
+  let d = digits(raw);
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("966")) return `+${d}`;
+  if (d.startsWith("05") && d.length === 10) return `+966${d.slice(1)}`;
+  if (d.startsWith("5") && d.length === 9) return `+966${d}`;
+  if (d.startsWith("20")) return `+${d}`;
+  if (d.startsWith("01") && d.length === 11) return `+2${d}`;
+  if (d.startsWith("1") && d.length === 10) return `+20${d}`;
+  return d ? `+${d}` : "";
+}
+
+export function isAdminPhone(phone: string) {
+  const d = digits(phone);
+  return d === ADMIN_DIGITS || d.endsWith("554937560");
+}
+
+export function canEnter(role: UserRole, screen: ScreenId) {
+  if (role === "admin") return true;
+  if (role === "merchant") return screen !== "admin";
+  return (
+    screen === "profile" ||
+    screen === "timeline" ||
+    screen === "carpool" ||
+    screen === "people" ||
+    screen === "chat"
+  );
+}
+
+export function canPublish(role: UserRole, screen: ScreenId) {
+  if (role === "admin" || role === "merchant") {
+    return (
+      screen === "timeline" ||
+      screen === "market" ||
+      screen === "delivery" ||
+      screen === "transport" ||
+      screen === "carpool" ||
+      screen === "services"
+    );
+  }
+  return screen === "timeline" || screen === "carpool";
+}
+
+function threadOf(a: string, b: string) {
+  return [a, b].sort().join(":");
+}
+
+function comment(me: VillageUser, text: string): Comment {
+  return {
+    id: nid(),
+    authorId: me.id,
+    authorName: me.name,
+    text: text.trim(),
+    createdAt: new Date().toISOString(),
+  };
 }
 
 type AccountRole = Extract<UserRole, "resident" | "merchant">;
 
 type NazlawiState = {
-  hydrated: boolean;
   users: VillageUser[];
   posts: TimelinePost[];
   products: Product[];
@@ -39,23 +95,35 @@ type NazlawiState = {
   rides: RideOffer[];
   carpools: CarpoolPost[];
   services: ServicePro[];
+  friends: FriendLink[];
   messages: ChatMessage[];
   currentUser: VillageUser | null;
   screen: ScreenId;
+  memberId: string | null;
+  chatWith: string | null;
   toast: string | null;
-  setHydrated: () => void;
   setScreen: (s: ScreenId) => void;
-  login: (name: string, phone: string, role: AccountRole) => void;
+  openMember: (id: string) => void;
+  openChat: (id: string) => void;
+  login: (name: string, phone: string, password: string, role: AccountRole) => void;
   logout: () => void;
-  approveUser: (id: string, approved: boolean) => void;
-  setSubscribed: (id: string, value: boolean) => void;
-  addPost: (caption: string, type: TimelinePost["type"]) => void;
+  updateMe: (patch: Partial<VillageUser>) => void;
+  banUser: (id: string, banned: boolean) => void;
+  addMember: (name: string, phone: string, role: UserRole) => void;
+  addPost: (caption: string, type: TimelinePost["type"], mediaUrl?: string) => void;
   likePost: (id: string) => void;
-  addProduct: (title: string, description: string, price: number) => void;
+  commentPost: (id: string, text: string) => void;
+  addProduct: (title: string, description: string, price: number, photo?: string) => void;
   reserveProduct: (title: string) => void;
+  commentProduct: (id: string, text: string) => void;
   setMyDelivery: (status: DeliveryStatus) => void;
-  addCarpool: (from: string, to: string, seats: number, note: string) => void;
-  sendMessage: (text?: string, voice?: boolean) => void;
+  addRide: (type: RideOffer["type"], from: string, to: string, price: number) => void;
+  addCarpool: (from: string, to: string, seats: number, note: string, photo?: string) => void;
+  commentCarpool: (id: string, text: string) => void;
+  addService: (specialty: string, neighborhood: string) => void;
+  requestFriend: (toId: string) => void;
+  answerFriend: (id: string, accept: boolean) => void;
+  sendMessage: (text: string) => void;
   clearToast: () => void;
   setToast: (msg: string | null) => void;
 };
@@ -63,7 +131,6 @@ type NazlawiState = {
 export const useNazlawi = create<NazlawiState>()(
   persist(
     (set, get) => ({
-      hydrated: false,
       users: [],
       posts: [],
       products: [],
@@ -71,74 +138,130 @@ export const useNazlawi = create<NazlawiState>()(
       rides: [],
       carpools: [],
       services: [],
+      friends: [],
       messages: [],
       currentUser: null,
       screen: "timeline",
+      memberId: null,
+      chatWith: null,
       toast: null,
-      setHydrated: () => set({ hydrated: true }),
-      setScreen: (screen) => set({ screen }),
-      login: (name, phone, role) => {
-        const nazlawiName = name.trim();
+      setScreen: (screen) => set({ screen, memberId: null }),
+      openMember: (id) => set({ screen: "people", memberId: id }),
+      openChat: (id) => set({ screen: "chat", chatWith: id, memberId: null }),
+      login: (name, phone, password, role) => {
+        const pass = password.trim();
         const normalized = normalizePhone(phone);
-        if (!nazlawiName || !normalized) return;
-        const existing = get().users.find(
-          (u) => u.phone.replace(/\D/g, "") === normalized.replace(/\D/g, ""),
-        );
-        const isAdmin = normalized.endsWith("0001") || existing?.role === "admin";
-        const nextRole: UserRole = isAdmin ? "admin" : role;
-        const user: VillageUser = existing
-          ? {
-              ...existing,
-              name: nazlawiName || existing.name,
-              role: isAdmin ? "admin" : role,
-              approved: true,
-            }
-          : {
-              id: nid(),
-              name: nazlawiName,
-              phone: normalized,
-              role: nextRole,
-              approved: true,
-              subscribed: nextRole === "admin" || role === "merchant",
-              neighborhood: "النزل",
-              createdAt: new Date().toISOString(),
-            };
+        if (!normalized || pass.length < 4) {
+          set({ toast: "أدخل رقم الجوال وكلمة السر" });
+          return;
+        }
+        const admin = isAdminPhone(normalized);
+        const nazlawiName = admin ? ADMIN_NAME : name.trim();
+        if (!nazlawiName) {
+          set({ toast: "أدخل الاسم" });
+          return;
+        }
+        const existing = get().users.find((u) => digits(u.phone) === digits(normalized));
+        if (existing?.banned) {
+          set({ toast: "الحساب محظور" });
+          return;
+        }
+        if (existing) {
+          if (existing.password && existing.password !== pass) {
+            set({ toast: "كلمة السر غلط" });
+            return;
+          }
+          const user: VillageUser = {
+            ...existing,
+            name: nazlawiName || existing.name,
+            password: existing.password || pass,
+            role: admin ? "admin" : existing.role,
+          };
+          set((s) => ({
+            currentUser: user,
+            users: s.users.map((u) => (u.id === user.id ? user : u)),
+            screen: user.role === "merchant" ? "market" : "timeline",
+            toast: null,
+          }));
+          return;
+        }
+        const nextRole: UserRole = admin ? "admin" : role;
+        const user: VillageUser = {
+          id: nid(),
+          name: nazlawiName,
+          phone: normalized,
+          password: pass,
+          role: nextRole,
+          approved: true,
+          banned: false,
+          neighborhood: "النزل",
+          showPhone: false,
+          showDetails: true,
+          createdAt: new Date().toISOString(),
+        };
         set((s) => ({
           currentUser: user,
-          users: existing
-            ? s.users.map((u) => (u.id === user.id ? user : u))
-            : [...s.users, user],
+          users: [...s.users, user],
           screen: nextRole === "merchant" ? "market" : "timeline",
+          toast: null,
         }));
       },
-      logout: () => set({ currentUser: null, screen: "timeline" }),
-      approveUser: (id, approved) =>
-        set((s) => ({
-          users: s.users.map((u) => (u.id === id ? { ...u, approved } : u)),
-          currentUser:
-            s.currentUser?.id === id
-              ? { ...s.currentUser, approved }
-              : s.currentUser,
-        })),
-      setSubscribed: (id, value) =>
-        set((s) => ({
-          users: s.users.map((u) => (u.id === id ? { ...u, subscribed: value } : u)),
-          currentUser:
-            s.currentUser?.id === id
-              ? { ...s.currentUser, subscribed: value }
-              : s.currentUser,
-        })),
-      addPost: (caption, type) => {
+      logout: () => set({ currentUser: null, screen: "timeline", memberId: null, chatWith: null }),
+      updateMe: (patch) => {
         const me = get().currentUser;
         if (!me) return;
+        const user = { ...me, ...patch, id: me.id, role: me.role, phone: me.phone };
+        set((s) => ({
+          currentUser: user,
+          users: s.users.map((u) => (u.id === me.id ? user : u)),
+        }));
+      },
+      banUser: (id, banned) => {
+        const me = get().currentUser;
+        if (me?.role !== "admin") return;
+        set((s) => ({
+          users: s.users.map((u) => (u.id === id ? { ...u, banned } : u)),
+          currentUser: s.currentUser?.id === id ? null : s.currentUser,
+          toast: banned ? "تم الحظر" : "تم إلغاء الحظر",
+        }));
+      },
+      addMember: (name, phone, role) => {
+        const me = get().currentUser;
+        if (me?.role !== "admin") return;
+        const normalized = normalizePhone(phone);
+        const nazlawiName = name.trim();
+        if (!normalized || !nazlawiName) return;
+        if (get().users.some((u) => digits(u.phone) === digits(normalized))) {
+          set({ toast: "الرقم مسجّل" });
+          return;
+        }
+        const user: VillageUser = {
+          id: nid(),
+          name: isAdminPhone(normalized) ? ADMIN_NAME : nazlawiName,
+          phone: normalized,
+          password: "",
+          role: isAdminPhone(normalized) ? "admin" : role,
+          approved: true,
+          banned: false,
+          neighborhood: "النزل",
+          showPhone: false,
+          showDetails: true,
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ users: [...s.users, user], toast: "تم" }));
+      },
+      addPost: (caption, type, mediaUrl) => {
+        const me = get().currentUser;
+        if (!me || !canPublish(me.role, "timeline")) return;
         const post: TimelinePost = {
           id: nid(),
           authorId: me.id,
           authorName: me.name,
           type,
           caption: caption.trim() || undefined,
-          durationSec: type === "voice" ? 8 : type === "video" ? 12 : 0,
+          mediaUrl,
           likes: 0,
+          comments: [],
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ posts: [post, ...s.posts], toast: "تم" }));
@@ -147,9 +270,18 @@ export const useNazlawi = create<NazlawiState>()(
         set((s) => ({
           posts: s.posts.map((p) => (p.id === id ? { ...p, likes: p.likes + 1 } : p)),
         })),
-      addProduct: (title, description, price) => {
+      commentPost: (id, text) => {
         const me = get().currentUser;
-        if (!me) return;
+        if (!me || !text.trim()) return;
+        set((s) => ({
+          posts: s.posts.map((p) =>
+            p.id === id ? { ...p, comments: [...p.comments, comment(me, text)] } : p,
+          ),
+        }));
+      },
+      addProduct: (title, description, price, photo) => {
+        const me = get().currentUser;
+        if (!me || !canPublish(me.role, "market")) return;
         const product: Product = {
           id: nid(),
           merchantId: me.id,
@@ -158,13 +290,24 @@ export const useNazlawi = create<NazlawiState>()(
           description: description.trim(),
           price: Number.isFinite(price) ? price : 0,
           unit: "قطعة",
+          photo,
+          comments: [],
         };
         set((s) => ({ products: [product, ...s.products], toast: "تم" }));
       },
       reserveProduct: (title) => set({ toast: `تم حجز «${title}»` }),
+      commentProduct: (id, text) => {
+        const me = get().currentUser;
+        if (!me || !text.trim()) return;
+        set((s) => ({
+          products: s.products.map((p) =>
+            p.id === id ? { ...p, comments: [...p.comments, comment(me, text)] } : p,
+          ),
+        }));
+      },
       setMyDelivery: (status) => {
         const me = get().currentUser;
-        if (!me) return;
+        if (!me || !canPublish(me.role, "delivery")) return;
         set((s) => {
           const exists = s.agents.some((a) => a.id === me.id);
           const agents = exists
@@ -183,29 +326,123 @@ export const useNazlawi = create<NazlawiState>()(
           return { agents };
         });
       },
-      addCarpool: (from, to, seats, note) => {
+      addRide: (type, from, to, price) => {
         const me = get().currentUser;
-        if (!me) return;
+        if (!me || !canPublish(me.role, "transport")) return;
+        set((s) => ({
+          rides: [
+            {
+              id: nid(),
+              type,
+              driverName: me.name,
+              phone: me.phone,
+              from: from.trim() || "النزل",
+              to: to.trim(),
+              price: Number(price) || 0,
+            },
+            ...s.rides,
+          ],
+          toast: "تم",
+        }));
+      },
+      addCarpool: (from, to, seats, note, photo) => {
+        const me = get().currentUser;
+        if (!me || !canPublish(me.role, "carpool")) return;
         const item: CarpoolPost = {
           id: nid(),
+          authorId: me.id,
           authorName: me.name,
           from: from.trim() || "النزل",
           to: to.trim(),
           seats: seats || 1,
           note: note.trim(),
+          photo,
+          comments: [],
         };
         set((s) => ({ carpools: [item, ...s.carpools], toast: "تم" }));
       },
-      sendMessage: (text, voice) => {
+      commentCarpool: (id, text) => {
+        const me = get().currentUser;
+        if (!me || !text.trim()) return;
+        set((s) => ({
+          carpools: s.carpools.map((p) =>
+            p.id === id ? { ...p, comments: [...p.comments, comment(me, text)] } : p,
+          ),
+        }));
+      },
+      addService: (specialty, neighborhood) => {
+        const me = get().currentUser;
+        if (!me || !canPublish(me.role, "services")) return;
+        set((s) => ({
+          services: [
+            {
+              id: nid(),
+              ownerId: me.id,
+              name: me.name,
+              specialty: specialty.trim(),
+              phone: me.phone,
+              neighborhood: neighborhood.trim() || "النزل",
+              rating: 5,
+            },
+            ...s.services,
+          ],
+          toast: "تم",
+        }));
+      },
+      requestFriend: (toId) => {
+        const me = get().currentUser;
+        if (!me || me.id === toId) return;
+        const exists = get().friends.find(
+          (f) =>
+            (f.fromId === me.id && f.toId === toId) ||
+            (f.fromId === toId && f.toId === me.id),
+        );
+        if (exists?.status === "accepted") return;
+        if (exists?.status === "pending") return;
+        const link: FriendLink = {
+          id: nid(),
+          fromId: me.id,
+          toId,
+          status: "pending",
+        };
+        set((s) => ({
+          friends: exists
+            ? s.friends.map((f) => (f.id === exists.id ? { ...f, status: "pending", fromId: me.id, toId } : f))
+            : [...s.friends, link],
+          toast: "تم",
+        }));
+      },
+      answerFriend: (id, accept) => {
         const me = get().currentUser;
         if (!me) return;
-        if (!voice && !text?.trim()) return;
+        set((s) => ({
+          friends: s.friends.map((f) =>
+            f.id === id && f.toId === me.id
+              ? { ...f, status: accept ? "accepted" : "rejected" }
+              : f,
+          ),
+        }));
+      },
+      sendMessage: (text) => {
+        const me = get().currentUser;
+        const other = get().chatWith;
+        if (!me || !other || !text.trim()) return;
+        const ok = get().friends.some(
+          (f) =>
+            f.status === "accepted" &&
+            ((f.fromId === me.id && f.toId === other) ||
+              (f.fromId === other && f.toId === me.id)),
+        );
+        if (!ok && me.role !== "admin") {
+          set({ toast: "الصداقة مطلوبة" });
+          return;
+        }
         const msg: ChatMessage = {
           id: nid(),
+          threadId: threadOf(me.id, other),
           senderId: me.id,
           senderName: me.name,
-          text: voice ? undefined : text?.trim(),
-          audioDuration: voice ? 6 : 0,
+          text: text.trim(),
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ messages: [...s.messages, msg] }));
@@ -214,7 +451,7 @@ export const useNazlawi = create<NazlawiState>()(
       setToast: (msg) => set({ toast: msg }),
     }),
     {
-      name: "nazlawi-v3",
+      name: "nazlawi-v4",
       skipHydration: true,
       partialize: (s) => ({
         users: s.users,
@@ -224,6 +461,7 @@ export const useNazlawi = create<NazlawiState>()(
         rides: s.rides,
         carpools: s.carpools,
         services: s.services,
+        friends: s.friends,
         messages: s.messages,
         currentUser: s.currentUser,
         screen: s.screen,
@@ -231,3 +469,17 @@ export const useNazlawi = create<NazlawiState>()(
     },
   ),
 );
+
+export function areFriends(friends: FriendLink[], a: string, b: string) {
+  return friends.some(
+    (f) =>
+      f.status === "accepted" &&
+      ((f.fromId === a && f.toId === b) || (f.fromId === b && f.toId === a)),
+  );
+}
+
+export function friendLink(friends: FriendLink[], a: string, b: string) {
+  return friends.find(
+    (f) => (f.fromId === a && f.toId === b) || (f.fromId === b && f.toId === a),
+  );
+}
