@@ -18,11 +18,20 @@ export function blobToken() {
   return "";
 }
 
+function extFor(contentType: string, filename: string) {
+  if (contentType.includes("webm")) return "webm";
+  if (contentType.includes("mp4") || contentType.includes("quicktime")) return "mp4";
+  const fromName = filename.split(".").pop()?.toLowerCase();
+  if (fromName && /^[a-z0-9]{2,4}$/.test(fromName)) return fromName;
+  return contentType.startsWith("video/") ? "mp4" : "jpg";
+}
+
 export const uploadMarketMedia = createServerFn({ method: "POST" })
   .validator((d: { filename: string; contentType: string; dataUrl: string }) => d)
   .handler(async ({ data }) => {
     try {
-      const filename = String(data.filename ?? "photo.jpg").slice(0, 120);
+      const filename = String(data.filename ?? "file").slice(0, 120);
+      const contentType = String(data.contentType ?? "image/jpeg").slice(0, 80);
       const dataUrl = String(data.dataUrl ?? "");
       if (!dataUrl.startsWith("data:")) return { ok: false as const, url: "", error: "file" };
 
@@ -31,14 +40,15 @@ export const uploadMarketMedia = createServerFn({ method: "POST" })
       if (!buffer.length) return { ok: false as const, url: "", error: "empty" };
 
       const token = blobToken();
-      const storedName = `${Date.now()}-${safeName(filename)}.jpg`;
+      const storedName = `${Date.now()}-${safeName(filename)}.${extFor(contentType, filename)}`;
+      const mime = contentType.startsWith("video/") ? contentType : contentType.startsWith("image/") ? contentType : "image/jpeg";
 
       if (token) {
         const { put } = await import("@vercel/blob");
         const stored = await put(`nazlawi/${storedName}`, buffer, {
           access: "public",
           token,
-          contentType: "image/jpeg",
+          contentType: mime,
         });
         return { ok: true as const, url: stored.url };
       }

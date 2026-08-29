@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Phone, ShoppingBasket, Store, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { uploadMarketMedia } from "@/lib/nazlawi/blob";
 import {
-  acceptShopOrder,
   addProductComment,
-  addShopOffer,
-  addShopProduct,
   deleteShopProduct,
   ensureShop,
   getShopCatalog,
+  listMarketFeed,
   listShopOrders,
   listShops,
   placeShopOrder,
+  PRODUCT_PAGE,
+  type CategoryRow,
   type CommentRow,
+  type FeedRow,
   type OfferRow,
   type OrderItemRow,
   type OrderRow,
@@ -23,50 +23,80 @@ import {
   type ShopRow,
 } from "@/lib/nazlawi/market-fns";
 import { useNazlawi } from "@/lib/nazlawi/store";
-import { compressImage } from "./media";
+import { MerchantDashboard } from "./merchant";
+
+function merchantKey(email?: string, phone?: string) {
+  return email || phone || "";
+}
 
 export function MarketScreen() {
   const me = useNazlawi((s) => s.currentUser);
   const shopId = useNazlawi((s) => s.shopId);
   const setShopId = useNazlawi((s) => s.setShopId);
+  const shopMode = useNazlawi((s) => s.shopMode);
+  const setErrorToast = useNazlawi((s) => s.setToast);
   const [shops, setShops] = useState<ShopRow[]>([]);
-  const [error, setError] = useState("");
+  const [feed, setFeed] = useState<Awaited<ReturnType<typeof listMarketFeed>>>([]);
 
-  async function reload() {
+  async function reloadMarket() {
     try {
-      const rows = await listShops();
-      setShops(rows ?? []);
-      setError("");
+      const [shopRows, feedRows] = await Promise.all([listShops(), listMarketFeed()]);
+      setShops(shopRows ?? []);
+      setFeed(feedRows ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر تحميل السوق");
+      setErrorToast(err instanceof Error ? err.message : "تعذر تحميل السوق");
     }
   }
 
   useEffect(() => {
-    void reload();
+    void reloadMarket();
   }, []);
 
   async function openMyShop() {
     if (!me || (me.role !== "merchant" && me.role !== "admin")) return;
     try {
-      const shop = await ensureShop({ data: { phone: me.email || me.phone, name: me.name } });
+      const shop = await ensureShop({
+        data: { phone: merchantKey(me.email, me.phone), name: me.name, userId: me.id },
+      });
       if (shop?.id) {
         setShopId(shop.id);
         return;
       }
-      setError("تعذر فتح المتجر");
+      setErrorToast("تعذر فتح المتجر");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر فتح المتجر");
+      setErrorToast(err instanceof Error ? err.message : "تعذر فتح المتجر");
     }
   }
+
+  useEffect(() => {
+    if (shopMode === "store" && !shopId && me && (me.role === "merchant" || me.role === "admin")) {
+      void openMyShop();
+    }
+  }, [shopMode, shopId, me?.id]);
 
   if (shopId) return <ShopPage shopId={shopId} onBack={() => setShopId(null)} />;
 
   return (
     <div className="flex flex-col gap-3">
-      {me && (me.role === "merchant" || me.role === "admin") ? (
-        <Button onClick={() => void openMyShop()}>متجري</Button>
+      {me && (me.role === "merchant" || me.role === "admin") && shopMode === "store" ? (
+        <Button onClick={() => void openMyShop()}>لوحة متجري</Button>
       ) : null}
+
+      {feed.map((post) => (
+        <button
+          key={post.id}
+          className="overflow-hidden rounded-2xl bg-card text-right shadow-sm"
+          onClick={() => post.shop?.id && setShopId(post.shop.id)}
+        >
+          {post.photo_url ? <img src={post.photo_url} alt="" className="h-36 w-full object-cover" /> : null}
+          <div className="p-4">
+            <p className="font-extrabold">{post.title}</p>
+            {post.body ? <p className="text-sm text-muted-foreground">{post.body}</p> : null}
+            <p className="mt-2 text-sm font-bold text-primary">{post.shop?.title ?? "المتجر"}</p>
+          </div>
+        </button>
+      ))}
+
       {shops.map((shop) => (
         <button
           key={shop.id}
@@ -86,35 +116,48 @@ export function MarketScreen() {
           </div>
         </button>
       ))}
-      {error ? <p className="text-center text-sm text-coral">{error}</p> : null}
-      {!shops.length && !error ? <p className="text-center text-sm text-muted-foreground">السوق فاضي</p> : null}
+      {shops.length === 0 && feed.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground">السوق فاضي</p>
+      ) : null}
     </div>
   );
 }
 
 function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const me = useNazlawi((s) => s.currentUser);
+  const shopMode = useNazlawi((s) => s.shopMode);
   const setToast = useNazlawi((s) => s.setToast);
   const addToCart = useNazlawi((s) => s.addToCart);
   const [shop, setShop] = useState<ShopRow | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [feed, setFeed] = useState<FeedRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [pickup, setPickup] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [filter, setFilter] = useState("");
+  const key = merchantKey(me?.email, me?.phone);
   const owner = Boolean(me && shop && (me.email === shop.merchant_phone || me.phone === shop.merchant_phone));
+  const manage = owner && shopMode === "store";
 
-  async function reload() {
+  async function reload(nextOffset = 0) {
     try {
-      const cat = await getShopCatalog({ data: { shopId } });
+      const cat = await getShopCatalog({ data: { shopId, offset: nextOffset, limit: PRODUCT_PAGE } });
       setShop(cat.shop);
-      setProducts(cat.products ?? []);
+      setProducts(nextOffset ? (prev) => [...prev, ...(cat.products ?? [])] : (cat.products ?? []));
       setOffers(cat.offers ?? []);
       setComments(cat.comments ?? []);
+      setCategories(cat.categories ?? []);
+      setFeed(cat.feed ?? []);
+      setHasMore(Boolean(cat.hasMore));
+      setOffset(nextOffset);
       if (me && cat.shop && (me.email === cat.shop.merchant_phone || me.phone === cat.shop.merchant_phone)) {
-        const pack = await listShopOrders({ data: { shopId, phone: me.email || me.phone } });
+        const pack = await listShopOrders({ data: { shopId, phone: key } });
         setOrders(pack.orders ?? []);
         setOrderItems(pack.items ?? []);
       }
@@ -124,12 +167,14 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   }
 
   useEffect(() => {
-    void reload();
-  }, [shopId, me?.phone]);
+    void reload(0);
+  }, [shopId, me?.email, shopMode]);
 
   const total = useMemo(() => {
     return products.reduce((sum, p) => sum + (cart[p.id] ?? 0) * Number(p.price), 0);
   }, [products, cart]);
+
+  const visible = filter ? products.filter((p) => p.category_id === filter) : products;
 
   if (!shop) return null;
 
@@ -138,7 +183,9 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
       <button className="self-start text-sm font-bold text-primary" onClick={onBack}>
         السوق
       </button>
-      {shop.cover_url ? (
+      {shop.promo_video_url ? (
+        <video src={shop.promo_video_url} className="h-52 w-full rounded-3xl bg-ink object-cover" controls playsInline />
+      ) : shop.cover_url ? (
         <img src={shop.cover_url} alt="" className="h-36 w-full rounded-2xl object-cover" />
       ) : null}
       <div>
@@ -149,6 +196,20 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
           {shop.merchant_phone}
         </a>
       </div>
+
+      {feed.length ? (
+        <div className="flex flex-col gap-2">
+          {feed.map((post) => (
+            <Card key={post.id} className="overflow-hidden p-0">
+              {post.photo_url ? <img src={post.photo_url} alt="" className="h-28 w-full object-cover" /> : null}
+              <div className="p-3">
+                <p className="font-extrabold">{post.title}</p>
+                {post.body ? <p className="text-sm text-muted-foreground">{post.body}</p> : null}
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       {offers.length ? (
         <div className="flex flex-col gap-2">
@@ -161,7 +222,25 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
         </div>
       ) : null}
 
-      {products.map((p) => (
+      {categories.length ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Button size="sm" variant={filter ? "secondary" : "default"} onClick={() => setFilter("")}>
+            الكل
+          </Button>
+          {categories.map((c) => (
+            <Button
+              key={c.id}
+              size="sm"
+              variant={filter === c.id ? "default" : "secondary"}
+              onClick={() => setFilter(c.id)}
+            >
+              {c.title}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
+      {visible.map((p) => (
         <Card key={p.id} className="p-3">
           <div className="flex gap-3">
             {p.photo_url ? (
@@ -175,6 +254,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
               <p className="font-extrabold">{p.title}</p>
               <p className="text-sm text-muted-foreground">{p.description}</p>
               <p className="font-extrabold text-primary">{Number(p.price)} ج</p>
+              <p className="text-xs text-muted-foreground">المتوفر {p.qty ?? 0}</p>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2">
@@ -186,10 +266,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
               −
             </Button>
             <span className="w-6 text-center font-extrabold">{cart[p.id] ?? 0}</span>
-            <Button
-              size="sm"
-              onClick={() => setCart((c) => ({ ...c, [p.id]: (c[p.id] ?? 0) + 1 }))}
-            >
+            <Button size="sm" onClick={() => setCart((c) => ({ ...c, [p.id]: (c[p.id] ?? 0) + 1 }))}>
               +
             </Button>
             <Button
@@ -207,15 +284,15 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
             >
               العربة
             </Button>
-            {owner ? (
+            {manage ? (
               <Button
                 size="sm"
                 variant="outline"
                 className="mr-auto"
                 onClick={async () => {
-                  await deleteShopProduct({ data: { productId: p.id, phone: me!.email || me!.phone } });
+                  await deleteShopProduct({ data: { productId: p.id, phone: key } });
                   setToast("تم الحذف");
-                  void reload();
+                  void reload(0);
                 }}
               >
                 <Trash2 className="size-4" />
@@ -243,7 +320,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                   },
                 });
                 e.currentTarget.reset();
-                void reload();
+                void reload(offset);
               }}
             >
               <Input name="c" placeholder="تعليق" className="h-9" />
@@ -255,18 +332,18 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
         </Card>
       ))}
 
+      {hasMore ? (
+        <Button variant="secondary" onClick={() => void reload(offset + PRODUCT_PAGE)}>
+          المزيد
+        </Button>
+      ) : null}
+
       {total > 0 && me ? (
         <Card className="space-y-3 p-4">
           <p className="font-extrabold">الحجز · {total} ج</p>
           <label className="text-sm">
             ميعاد الاستلام
-            <Input
-              type="datetime-local"
-              className="mt-1"
-              value={pickup}
-              onChange={(e) => setPickup(e.target.value)}
-              required
-            />
+            <Input type="datetime-local" className="mt-1" value={pickup} onChange={(e) => setPickup(e.target.value)} />
           </label>
           <Button
             className="w-full"
@@ -275,7 +352,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                 setToast("حدد ميعاد الاستلام");
                 return;
               }
-              const items = products
+              const picked = products
                 .filter((p) => (cart[p.id] ?? 0) > 0)
                 .map((p) => ({
                   productId: p.id,
@@ -287,9 +364,9 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                 data: {
                   shopId: shop.id,
                   buyerName: me.name,
-                  buyerPhone: me.email || me.phone,
+                  buyerPhone: merchantKey(me.email, me.phone),
                   pickupAt: pickup,
-                  items,
+                  items: picked,
                 },
               });
               if (res.ok) {
@@ -303,152 +380,17 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
         </Card>
       ) : null}
 
-      {owner ? <MerchantTools shop={shop} onChanged={() => void reload()} orders={orders} items={orderItems} /> : null}
-    </div>
-  );
-}
-
-function MerchantTools({
-  shop,
-  onChanged,
-  orders,
-  items,
-}: {
-  shop: ShopRow;
-  onChanged: () => void;
-  orders: OrderRow[];
-  items: OrderItemRow[];
-}) {
-  const me = useNazlawi((s) => s.currentUser);
-  const setToast = useNazlawi((s) => s.setToast);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [photo, setPhoto] = useState("");
-  if (!me) return null;
-
-  return (
-    <div className="flex flex-col gap-3">
-      <Card className="space-y-3 p-4">
-        <p className="font-extrabold">منتج جديد</p>
-        <form
-          className="space-y-2"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            const res = await addShopProduct({
-              data: {
-                shopId: shop.id,
-                phone: me.email || me.phone,
-                title: String(fd.get("title") ?? ""),
-                description: String(fd.get("desc") ?? ""),
-                price: Number(fd.get("price") ?? 0),
-                photoUrl: photo || undefined,
-              },
-            });
-            if (!res.ok) {
-              setToast(res.error ?? "تعذر النشر");
-              return;
-            }
-            e.currentTarget.reset();
-            setPhoto("");
-            setToast("تم");
-            onChanged();
+      {manage ? (
+        <MerchantDashboard
+          shop={shop}
+          categories={categories}
+          orders={orders}
+          items={orderItems}
+          onChanged={() => {
+            void reload(0);
           }}
-        >
-          <Input name="title" required placeholder="اسم المنتج" />
-          <Input name="desc" placeholder="الوصف" />
-          <Input name="price" inputMode="numeric" placeholder="السعر" />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              try {
-                const dataUrl = await compressImage(file);
-                const up = await uploadMarketMedia({
-                  data: {
-                    filename: file.name.replace(/\.[^.]+$/, "") + ".jpg",
-                    contentType: "image/jpeg",
-                    dataUrl,
-                  },
-                });
-                if (up.ok) setPhoto(up.url);
-                else setToast(up.error ?? "التخزين مش جاهز");
-              } catch {
-                setToast("تعذر رفع الصورة");
-              }
-            }}
-          />
-          <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>
-            صورة المنتج
-          </Button>
-          {photo ? <img src={photo} alt="" className="h-24 rounded-lg object-cover" /> : null}
-          <Button type="submit" className="w-full">
-            نشر المنتج
-          </Button>
-        </form>
-      </Card>
-
-      <Card className="space-y-3 p-4">
-        <p className="font-extrabold">عرض</p>
-        <form
-          className="space-y-2"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            await addShopOffer({
-              data: {
-                shopId: shop.id,
-                phone: me.email || me.phone,
-                title: String(fd.get("title") ?? ""),
-                detail: String(fd.get("detail") ?? ""),
-              },
-            });
-            e.currentTarget.reset();
-            setToast("تم");
-            onChanged();
-          }}
-        >
-          <Input name="title" required placeholder="عنوان العرض" />
-          <Input name="detail" placeholder="التفاصيل" />
-          <Button type="submit" className="w-full">
-            نشر العرض
-          </Button>
-        </form>
-      </Card>
-
-      {orders.map((order) => (
-        <Card key={order.id} className="space-y-2 p-4">
-          <p className="font-extrabold">{order.buyer_name}</p>
-          <a href={`tel:${order.buyer_phone}`} className="text-sm text-primary">
-            {order.buyer_phone}
-          </a>
-          <p className="text-sm">الاستلام: {order.pickup_at.replace("T", " ")}</p>
-          {items
-            .filter((i) => i.order_id === order.id)
-            .map((i) => (
-              <p key={i.id} className="text-sm">
-                {i.title} × {i.qty}
-              </p>
-            ))}
-          {order.status === "pending" ? (
-            <Button
-              className="w-full"
-              onClick={async () => {
-                await acceptShopOrder({ data: { orderId: order.id, phone: me.email || me.phone } });
-                setToast("تم قبول الطلب");
-                onChanged();
-              }}
-            >
-              قبول بعد الاستلام
-            </Button>
-          ) : (
-            <p className="text-sm font-extrabold text-primary">مقفل</p>
-          )}
-        </Card>
-      ))}
+        />
+      ) : null}
     </div>
   );
 }

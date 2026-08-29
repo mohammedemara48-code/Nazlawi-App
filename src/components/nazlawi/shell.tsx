@@ -90,6 +90,9 @@ export function Shell() {
   const user = useNazlawi((s) => s.currentUser);
   const role = user?.role ?? "resident";
   const cartCount = useNazlawi((s) => s.cart.reduce((n, i) => n + i.qty, 0));
+  const shopMode = useNazlawi((s) => s.shopMode);
+  const setShopMode = useNazlawi((s) => s.setShopMode);
+  const setShopId = useNazlawi((s) => s.setShopId);
   const [open, setOpen] = useState(false);
   const [compose, setCompose] = useState<ComposeKind | null>(null);
   const items = NAV.filter((n) => canEnter(role, n.id));
@@ -113,7 +116,21 @@ export function Shell() {
           <Menu className="size-5" />
         </Button>
         <div className="min-w-0 flex-1 text-center">
-          <p className="truncate font-extrabold">{title}</p>
+          {user && (user.role === "merchant" || user.role === "admin") ? (
+            <button
+              className="mx-auto rounded-full bg-secondary px-3 py-1 text-xs font-extrabold text-secondary-foreground"
+              onClick={() => {
+                const next = shopMode === "store" ? "browse" : "store";
+                setShopMode(next);
+                if (next === "store") setScreen("market");
+                else setShopId(null);
+              }}
+            >
+              {shopMode === "store" ? "عرض متجري" : "تسوق كمستهلك"}
+            </button>
+          ) : (
+            <p className="truncate font-extrabold">{title}</p>
+          )}
         </div>
         <Button
           variant="ghost"

@@ -27,3 +27,25 @@ export async function compressImage(file: File, max = 1280) {
   ctx.drawImage(img, 0, 0, w, h);
   return canvas.toDataURL("image/jpeg", 0.82);
 }
+
+const MAX_VIDEO_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 30;
+
+export async function validatePromoVideo(file: File) {
+  if (!file.type.startsWith("video/")) return "اختار فيديو";
+  if (file.size > MAX_VIDEO_BYTES) return "الفيديو أكبر من 10MB";
+  const url = URL.createObjectURL(file);
+  try {
+    const duration = await new Promise<number>((resolve, reject) => {
+      const el = document.createElement("video");
+      el.preload = "metadata";
+      el.onloadedmetadata = () => resolve(el.duration || 0);
+      el.onerror = () => reject(new Error("video"));
+      el.src = url;
+    });
+    if (duration > MAX_VIDEO_SECONDS + 0.4) return "الفيديو أطول من 30 ثانية";
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  return null;
+}

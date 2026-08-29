@@ -1,6 +1,7 @@
 import { blobToken } from "./blob";
 
 const PATH = "nazlawi/market-v2.json";
+export const PRODUCT_PAGE = 6;
 
 export type ShopRow = {
   id: string;
@@ -8,15 +9,26 @@ export type ShopRow = {
   merchant_name: string;
   title: string;
   cover_url: string | null;
+  promo_video_url: string | null;
+  user_id: string;
+};
+
+export type CategoryRow = {
+  id: string;
+  shop_id: string;
+  title: string;
 };
 
 export type ProductRow = {
   id: string;
   shop_id: string;
+  category_id: string | null;
   title: string;
   description: string;
   price: string;
+  qty: number;
   photo_url: string | null;
+  created_at: string;
 };
 
 export type OfferRow = {
@@ -26,13 +38,15 @@ export type OfferRow = {
   detail: string;
 };
 
+export type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
+
 export type OrderRow = {
   id: string;
   shop_id: string;
   buyer_name: string;
   buyer_phone: string;
   pickup_at: string;
-  status: string;
+  status: OrderStatus | string;
 };
 
 export type OrderItemRow = {
@@ -51,6 +65,15 @@ export type CommentRow = {
   text: string;
 };
 
+export type FeedRow = {
+  id: string;
+  shop_id: string;
+  title: string;
+  body: string;
+  photo_url: string | null;
+  created_at: string;
+};
+
 export type MarketDB = {
   shops: ShopRow[];
   products: ProductRow[];
@@ -58,14 +81,47 @@ export type MarketDB = {
   orders: OrderRow[];
   items: OrderItemRow[];
   comments: CommentRow[];
+  categories: CategoryRow[];
+  feed: FeedRow[];
 };
 
 function empty(): MarketDB {
-  return { shops: [], products: [], offers: [], orders: [], items: [], comments: [] };
+  return {
+    shops: [],
+    products: [],
+    offers: [],
+    orders: [],
+    items: [],
+    comments: [],
+    categories: [],
+    feed: [],
+  };
 }
 
 export function hasBlob() {
   return Boolean(blobToken());
+}
+
+function hydrate(json: Partial<MarketDB>): MarketDB {
+  return {
+    shops: (json.shops ?? []).map((s) => ({
+      ...s,
+      promo_video_url: s.promo_video_url ?? null,
+      user_id: s.user_id || s.merchant_phone,
+    })),
+    products: (json.products ?? []).map((p) => ({
+      ...p,
+      category_id: p.category_id ?? null,
+      qty: Number(p.qty ?? 0),
+      created_at: p.created_at || new Date().toISOString(),
+    })),
+    offers: json.offers ?? [],
+    orders: json.orders ?? [],
+    items: json.items ?? [],
+    comments: json.comments ?? [],
+    categories: json.categories ?? [],
+    feed: json.feed ?? [],
+  };
 }
 
 export async function loadMarket(): Promise<MarketDB> {
@@ -77,15 +133,7 @@ export async function loadMarket(): Promise<MarketDB> {
   if (!file) return empty();
   const res = await fetch(file.url, { cache: "no-store" });
   if (!res.ok) return empty();
-  const json = (await res.json()) as Partial<MarketDB>;
-  return {
-    shops: json.shops ?? [],
-    products: json.products ?? [],
-    offers: json.offers ?? [],
-    orders: json.orders ?? [],
-    items: json.items ?? [],
-    comments: json.comments ?? [],
-  };
+  return hydrate((await res.json()) as Partial<MarketDB>);
 }
 
 export async function saveMarket(db: MarketDB) {
@@ -99,4 +147,14 @@ export async function saveMarket(db: MarketDB) {
     allowOverwrite: true,
     contentType: "application/json",
   });
+}
+
+export function pageSlice<T>(rows: T[], offset = 0, limit = PRODUCT_PAGE) {
+  const start = Math.max(0, offset);
+  const end = start + Math.max(1, limit);
+  return {
+    rows: rows.slice(start, end),
+    total: rows.length,
+    hasMore: end < rows.length,
+  };
 }

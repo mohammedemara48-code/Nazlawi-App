@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { listShops, type ShopRow } from "@/lib/nazlawi/market-fns";
+import { listMarketFeed, listShops, type ShopRow } from "@/lib/nazlawi/market-fns";
 import { useNazlawi } from "@/lib/nazlawi/store";
 import type { ScreenId } from "@/lib/nazlawi/types";
 
@@ -47,6 +47,9 @@ export function HomeScreen() {
   const [slide, setSlide] = useState(0);
   const [query, setQuery] = useState("");
   const [shops, setShops] = useState<ShopRow[]>([]);
+  const [feed, setFeed] = useState<
+    { id: string; title: string; body: string; photo_url: string | null; shop: ShopRow | null }[]
+  >([]);
   const camRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -55,7 +58,12 @@ export function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    void listShops().then((rows) => setShops(rows ?? [])).catch(() => undefined);
+    void listShops()
+      .then((rows) => setShops(rows ?? []))
+      .catch(() => undefined);
+    void listMarketFeed()
+      .then((rows) => setFeed(rows ?? []))
+      .catch(() => undefined);
   }, []);
 
   const banner = BANNERS[slide];
@@ -143,6 +151,25 @@ export function HomeScreen() {
           );
         })}
       </div>
+
+      {feed.length ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-extrabold">من السوق</p>
+          {feed.slice(0, 6).map((post) => (
+            <button
+              key={post.id}
+              className="overflow-hidden rounded-2xl bg-card text-right shadow-sm"
+              onClick={() => post.shop?.id && setShopId(post.shop.id)}
+            >
+              {post.photo_url ? <img src={post.photo_url} alt="" className="h-28 w-full object-cover" /> : null}
+              <div className="px-3 py-3">
+                <p className="font-extrabold">{post.title}</p>
+                <p className="text-xs text-primary">{post.shop?.title}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {filtered.length ? (
         <div className="flex flex-col gap-2">

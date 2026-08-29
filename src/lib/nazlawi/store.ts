@@ -98,11 +98,13 @@ type NazlawiState = {
   memberId: string | null;
   chatWith: string | null;
   shopId: string | null;
+  shopMode: "store" | "browse";
   toast: string | null;
   setScreen: (s: ScreenId) => void;
   openMember: (id: string) => void;
   openChat: (id: string) => void;
   setShopId: (id: string | null) => void;
+  setShopMode: (mode: "store" | "browse") => void;
   login: (email: string, password: string, role: AccountRole) => void;
   logout: () => void;
   addToCart: (item: Omit<CartItem, "qty">, qty?: number) => void;
@@ -147,11 +149,13 @@ export const useNazlawi = create<NazlawiState>()(
       memberId: null,
       chatWith: null,
       shopId: null,
+      shopMode: "browse",
       toast: null,
       setScreen: (screen) => set({ screen, memberId: null, shopId: null }),
       openMember: (id) => set({ screen: "people", memberId: id }),
       openChat: (id) => set({ screen: "chat", chatWith: id, memberId: null }),
       setShopId: (shopId) => set({ shopId, screen: "market" }),
+      setShopMode: (shopMode) => set({ shopMode }),
       login: (email, password, role) => {
         const pass = password.trim();
         const mail = normalizeEmail(email);
@@ -485,6 +489,7 @@ export const useNazlawi = create<NazlawiState>()(
         cart: s.cart,
         currentUser: s.currentUser,
         screen: s.screen,
+        shopMode: s.shopMode,
       }),
     },
   ),
