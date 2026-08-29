@@ -4,6 +4,10 @@ export type RideType = "toktok" | "taxi" | "truck";
 export type DeliveryStatus = "available" | "busy" | "offline";
 export type FriendStatus = "pending" | "accepted" | "rejected";
 export type ScreenId =
+  | "home"
+  | "categories"
+  | "offers"
+  | "cart"
   | "profile"
   | "timeline"
   | "people"
@@ -26,6 +30,7 @@ export type Comment = {
 export type VillageUser = {
   id: string;
   name: string;
+  email: string;
   phone: string;
   password: string;
   role: UserRole;
@@ -38,6 +43,15 @@ export type VillageUser = {
   showPhone: boolean;
   showDetails: boolean;
   createdAt: string;
+};
+
+export type CartItem = {
+  productId: string;
+  shopId: string;
+  title: string;
+  price: number;
+  qty: number;
+  photo?: string;
 };
 
 export type TimelinePost = {

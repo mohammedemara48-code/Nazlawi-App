@@ -49,7 +49,7 @@ export function MarketScreen() {
   async function openMyShop() {
     if (!me || (me.role !== "merchant" && me.role !== "admin")) return;
     try {
-      const shop = await ensureShop({ data: { phone: me.phone, name: me.name } });
+      const shop = await ensureShop({ data: { phone: me.email || me.phone, name: me.name } });
       if (shop?.id) {
         setShopId(shop.id);
         return;
@@ -95,6 +95,7 @@ export function MarketScreen() {
 function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const me = useNazlawi((s) => s.currentUser);
   const setToast = useNazlawi((s) => s.setToast);
+  const addToCart = useNazlawi((s) => s.addToCart);
   const [shop, setShop] = useState<ShopRow | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [offers, setOffers] = useState<OfferRow[]>([]);
@@ -103,7 +104,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [pickup, setPickup] = useState("");
-  const owner = Boolean(me && shop && me.phone === shop.merchant_phone);
+  const owner = Boolean(me && shop && (me.email === shop.merchant_phone || me.phone === shop.merchant_phone));
 
   async function reload() {
     try {
@@ -112,8 +113,8 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
       setProducts(cat.products ?? []);
       setOffers(cat.offers ?? []);
       setComments(cat.comments ?? []);
-      if (me && cat.shop && me.phone === cat.shop.merchant_phone) {
-        const pack = await listShopOrders({ data: { shopId, phone: me.phone } });
+      if (me && cat.shop && (me.email === cat.shop.merchant_phone || me.phone === cat.shop.merchant_phone)) {
+        const pack = await listShopOrders({ data: { shopId, phone: me.email || me.phone } });
         setOrders(pack.orders ?? []);
         setOrderItems(pack.items ?? []);
       }
@@ -191,13 +192,28 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
             >
               +
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                addToCart({
+                  productId: p.id,
+                  shopId: shop.id,
+                  title: p.title,
+                  price: Number(p.price),
+                  photo: p.photo_url ?? undefined,
+                })
+              }
+            >
+              العربة
+            </Button>
             {owner ? (
               <Button
                 size="sm"
                 variant="outline"
                 className="mr-auto"
                 onClick={async () => {
-                  await deleteShopProduct({ data: { productId: p.id, phone: me!.phone } });
+                  await deleteShopProduct({ data: { productId: p.id, phone: me!.email || me!.phone } });
                   setToast("تم الحذف");
                   void reload();
                 }}
@@ -271,7 +287,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                 data: {
                   shopId: shop.id,
                   buyerName: me.name,
-                  buyerPhone: me.phone,
+                  buyerPhone: me.email || me.phone,
                   pickupAt: pickup,
                   items,
                 },
@@ -321,7 +337,7 @@ function MerchantTools({
             const res = await addShopProduct({
               data: {
                 shopId: shop.id,
-                phone: me.phone,
+                phone: me.email || me.phone,
                 title: String(fd.get("title") ?? ""),
                 description: String(fd.get("desc") ?? ""),
                 price: Number(fd.get("price") ?? 0),
@@ -385,7 +401,7 @@ function MerchantTools({
             await addShopOffer({
               data: {
                 shopId: shop.id,
-                phone: me.phone,
+                phone: me.email || me.phone,
                 title: String(fd.get("title") ?? ""),
                 detail: String(fd.get("detail") ?? ""),
               },
@@ -421,7 +437,7 @@ function MerchantTools({
             <Button
               className="w-full"
               onClick={async () => {
-                await acceptShopOrder({ data: { orderId: order.id, phone: me.phone } });
+                await acceptShopOrder({ data: { orderId: order.id, phone: me.email || me.phone } });
                 setToast("تم قبول الطلب");
                 onChanged();
               }}

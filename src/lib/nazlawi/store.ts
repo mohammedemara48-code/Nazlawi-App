@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   CarpoolPost,
+  CartItem,
   ChatMessage,
   Comment,
   DeliveryAgent,
@@ -17,7 +18,7 @@ import type {
 } from "./types";
 
 export const ADMIN_NAME = "Mohamed Mahmoud Emara";
-export const ADMIN_DIGITS = "966554937560";
+export const ADMIN_EMAIL = "mohammedemara48@gmail.com";
 
 const nid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -40,9 +41,12 @@ export function normalizePhone(raw: string) {
   return d ? `+${d}` : "";
 }
 
-export function isAdminPhone(phone: string) {
-  const d = digits(phone);
-  return d === ADMIN_DIGITS || d.endsWith("554937560");
+export function normalizeEmail(raw: string) {
+  return raw.trim().toLowerCase();
+}
+
+export function isAdminEmail(email: string) {
+  return normalizeEmail(email) === ADMIN_EMAIL;
 }
 
 export function canEnter(role: UserRole, screen: ScreenId) {
@@ -88,6 +92,7 @@ type NazlawiState = {
   services: ServicePro[];
   friends: FriendLink[];
   messages: ChatMessage[];
+  cart: CartItem[];
   currentUser: VillageUser | null;
   screen: ScreenId;
   memberId: string | null;
@@ -98,8 +103,11 @@ type NazlawiState = {
   openMember: (id: string) => void;
   openChat: (id: string) => void;
   setShopId: (id: string | null) => void;
-  login: (name: string, phone: string, password: string, role: AccountRole) => void;
+  login: (email: string, password: string, role: AccountRole) => void;
   logout: () => void;
+  addToCart: (item: Omit<CartItem, "qty">, qty?: number) => void;
+  setCartQty: (productId: string, qty: number) => void;
+  clearCart: () => void;
   updateMe: (patch: Partial<VillageUser>) => void;
   banUser: (id: string, banned: boolean) => void;
   addMember: (name: string, phone: string, role: UserRole) => void;
@@ -133,8 +141,9 @@ export const useNazlawi = create<NazlawiState>()(
       services: [],
       friends: [],
       messages: [],
+      cart: [],
       currentUser: null,
-      screen: "timeline",
+      screen: "home",
       memberId: null,
       chatWith: null,
       shopId: null,
@@ -143,20 +152,16 @@ export const useNazlawi = create<NazlawiState>()(
       openMember: (id) => set({ screen: "people", memberId: id }),
       openChat: (id) => set({ screen: "chat", chatWith: id, memberId: null }),
       setShopId: (shopId) => set({ shopId, screen: "market" }),
-      login: (name, phone, password, role) => {
+      login: (email, password, role) => {
         const pass = password.trim();
-        const normalized = normalizePhone(phone);
-        if (!normalized || pass.length < 4) {
-          set({ toast: "أدخل رقم الجوال وكلمة السر" });
+        const mail = normalizeEmail(email);
+        if (!mail.includes("@") || pass.length < 4) {
+          set({ toast: "أدخل الإيميل وكلمة السر" });
           return;
         }
-        const admin = isAdminPhone(normalized);
-        const nazlawiName = admin ? ADMIN_NAME : name.trim();
-        if (!nazlawiName) {
-          set({ toast: "أدخل الاسم" });
-          return;
-        }
-        const existing = get().users.find((u) => digits(u.phone) === digits(normalized));
+        const admin = isAdminEmail(mail);
+        const nazlawiName = admin ? ADMIN_NAME : mail.split("@")[0];
+        const existing = get().users.find((u) => normalizeEmail(u.email) === mail);
         if (existing?.banned) {
           set({ toast: "الحساب محظور" });
           return;
@@ -168,14 +173,14 @@ export const useNazlawi = create<NazlawiState>()(
           }
           const user: VillageUser = {
             ...existing,
-            name: nazlawiName || existing.name,
+            email: mail,
             password: existing.password || pass,
             role: admin ? "admin" : existing.role,
           };
           set((s) => ({
             currentUser: user,
             users: s.users.map((u) => (u.id === user.id ? user : u)),
-            screen: user.role === "merchant" ? "market" : "timeline",
+            screen: "home",
             toast: null,
           }));
           return;
@@ -184,7 +189,8 @@ export const useNazlawi = create<NazlawiState>()(
         const user: VillageUser = {
           id: nid(),
           name: nazlawiName,
-          phone: normalized,
+          email: mail,
+          phone: "",
           password: pass,
           role: nextRole,
           approved: true,
@@ -197,11 +203,28 @@ export const useNazlawi = create<NazlawiState>()(
         set((s) => ({
           currentUser: user,
           users: [...s.users, user],
-          screen: nextRole === "merchant" ? "market" : "timeline",
+          screen: "home",
           toast: null,
         }));
       },
-      logout: () => set({ currentUser: null, screen: "timeline", memberId: null, chatWith: null }),
+      logout: () => set({ currentUser: null, screen: "home", memberId: null, chatWith: null, shopId: null }),
+      addToCart: (item, qty = 1) =>
+        set((s) => {
+          const found = s.cart.find((c) => c.productId === item.productId);
+          if (found) {
+            return {
+              cart: s.cart.map((c) =>
+                c.productId === item.productId ? { ...c, qty: c.qty + qty } : c,
+              ),
+            };
+          }
+          return { cart: [...s.cart, { ...item, qty }] };
+        }),
+      setCartQty: (productId, qty) =>
+        set((s) => ({
+          cart: qty <= 0 ? s.cart.filter((c) => c.productId !== productId) : s.cart.map((c) => (c.productId === productId ? { ...c, qty } : c)),
+        })),
+      clearCart: () => set({ cart: [] }),
       updateMe: (patch) => {
         const me = get().currentUser;
         if (!me) return;
@@ -223,19 +246,20 @@ export const useNazlawi = create<NazlawiState>()(
       addMember: (name, phone, role) => {
         const me = get().currentUser;
         if (me?.role !== "admin") return;
-        const normalized = normalizePhone(phone);
+        const mail = normalizeEmail(phone);
         const nazlawiName = name.trim();
-        if (!normalized || !nazlawiName) return;
-        if (get().users.some((u) => digits(u.phone) === digits(normalized))) {
-          set({ toast: "الرقم مسجّل" });
+        if (!mail.includes("@") || !nazlawiName) return;
+        if (get().users.some((u) => normalizeEmail(u.email) === mail)) {
+          set({ toast: "الإيميل مسجّل" });
           return;
         }
         const user: VillageUser = {
           id: nid(),
-          name: isAdminPhone(normalized) ? ADMIN_NAME : nazlawiName,
-          phone: normalized,
+          name: isAdminEmail(mail) ? ADMIN_NAME : nazlawiName,
+          email: mail,
+          phone: "",
           password: "",
-          role: isAdminPhone(normalized) ? "admin" : role,
+          role: isAdminEmail(mail) ? "admin" : role,
           approved: true,
           banned: false,
           neighborhood: "النزل",
@@ -446,7 +470,7 @@ export const useNazlawi = create<NazlawiState>()(
       setToast: (msg) => set({ toast: msg }),
     }),
     {
-      name: "nazlawi-v4",
+      name: "nazlawi-v5",
       skipHydration: true,
       partialize: (s) => ({
         users: s.users,
@@ -458,6 +482,7 @@ export const useNazlawi = create<NazlawiState>()(
         services: s.services,
         friends: s.friends,
         messages: s.messages,
+        cart: s.cart,
         currentUser: s.currentUser,
         screen: s.screen,
       }),

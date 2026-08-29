@@ -5,11 +5,15 @@ import {
   Car,
   ClipboardList,
   Heart,
+  Home,
+  LayoutGrid,
   LogOut,
   Menu,
   MessageCircle,
+  Percent,
   Plus,
   Shield,
+  ShoppingCart,
   Store,
   Truck,
   UserRound,
@@ -22,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { canEnter, canPublish, useNazlawi } from "@/lib/nazlawi/store";
 import type { ScreenId } from "@/lib/nazlawi/types";
 import { LeafMark } from "./mark";
+import { CartScreen, CategoriesScreen, HomeScreen, OffersScreen } from "./home";
 import { MarketScreen } from "./market";
 import { readAsDataUrl } from "./media";
 import {
@@ -34,19 +39,27 @@ import {
 import { enableVillagePush } from "@/lib/nazlawi/push-client";
 
 const NAV: { id: ScreenId; title: string }[] = [
-  { id: "profile", title: "حسابي" },
-  { id: "timeline", title: "قريتي" },
-  { id: "people", title: "المشتركين" },
-  { id: "carpool", title: "خدني معاك" },
+  { id: "home", title: "الرئيسية" },
+  { id: "categories", title: "الفئات" },
+  { id: "offers", title: "العروض" },
   { id: "market", title: "سوق النزل" },
+  { id: "timeline", title: "قريتي" },
+  { id: "carpool", title: "خدني معاك" },
   { id: "delivery", title: "توصيل نزلاوي" },
   { id: "transport", title: "مواقف ونقل" },
   { id: "services", title: "دليل الخدمات" },
+  { id: "people", title: "المشتركين" },
   { id: "chat", title: "محادثة" },
+  { id: "profile", title: "الحساب" },
+  { id: "cart", title: "العربة" },
   { id: "admin", title: "لوحة الإدارة" },
 ];
 
 const ICONS: Record<ScreenId, typeof UserRound> = {
+  home: Home,
+  categories: LayoutGrid,
+  offers: Percent,
+  cart: ShoppingCart,
   profile: UserRound,
   timeline: ClipboardList,
   people: Users,
@@ -59,6 +72,14 @@ const ICONS: Record<ScreenId, typeof UserRound> = {
   admin: Shield,
 };
 
+const TAB: { id: ScreenId; title: string }[] = [
+  { id: "home", title: "الرئيسية" },
+  { id: "categories", title: "الفئات" },
+  { id: "offers", title: "عروض" },
+  { id: "profile", title: "الحساب" },
+  { id: "cart", title: "العربة" },
+];
+
 type ComposeKind = "post" | "product" | "carpool" | "ride" | "service";
 
 export function Shell() {
@@ -68,14 +89,21 @@ export function Shell() {
   const setToast = useNazlawi((s) => s.setToast);
   const user = useNazlawi((s) => s.currentUser);
   const role = user?.role ?? "resident";
+  const cartCount = useNazlawi((s) => s.cart.reduce((n, i) => n + i.qty, 0));
   const [open, setOpen] = useState(false);
   const [compose, setCompose] = useState<ComposeKind | null>(null);
   const items = NAV.filter((n) => canEnter(role, n.id));
   const title = items.find((n) => n.id === screen)?.title ?? "نزلاوي";
-  const showFab = canPublish(role, screen) && screen !== "market";
+  const showFab =
+    canPublish(role, screen) &&
+    screen !== "market" &&
+    screen !== "home" &&
+    screen !== "cart" &&
+    screen !== "categories" &&
+    screen !== "offers";
 
   useEffect(() => {
-    if (user && !canEnter(role, screen)) setScreen("timeline");
+    if (user && !canEnter(role, screen)) setScreen("home");
   }, [user, role, screen, setScreen]);
 
   return (
@@ -99,7 +127,11 @@ export function Shell() {
         </Button>
       </header>
 
-      <main className="flex-1 px-4 pb-24 pt-4">
+      <main className="flex-1 px-4 pb-28 pt-4">
+        {screen === "home" && <HomeScreen />}
+        {screen === "categories" && <CategoriesScreen />}
+        {screen === "offers" && <OffersScreen />}
+        {screen === "cart" && <CartScreen />}
         {screen === "profile" && <ProfileScreen />}
         {screen === "timeline" && <TimelineScreen />}
         {screen === "people" && <PeopleScreen />}
@@ -113,7 +145,7 @@ export function Shell() {
       </main>
 
       {showFab && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center">
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-20 flex justify-center">
           <Button
             className="pointer-events-auto shadow-lg"
             onClick={() =>
@@ -180,6 +212,41 @@ export function Shell() {
           </aside>
         </div>
       )}
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-lg items-end justify-between border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+        {TAB.map((tab) => {
+          const Icon = ICONS[tab.id];
+          const active = screen === tab.id;
+          const featured = tab.id === "offers";
+          return (
+            <button
+              key={tab.id}
+              className={`relative flex flex-1 flex-col items-center gap-1 ${
+                featured ? "-translate-y-3" : ""
+              }`}
+              onClick={() => setScreen(tab.id)}
+            >
+              <span
+                className={`flex items-center justify-center ${
+                  featured
+                    ? "size-14 rounded-full bg-primary text-primary-foreground shadow-lg"
+                    : `size-8 ${active ? "text-primary" : "text-muted-foreground"}`
+                }`}
+              >
+                <Icon className={featured ? "size-6" : "size-5"} />
+              </span>
+              <span className={`text-[11px] font-bold ${active ? "text-primary" : "text-muted-foreground"}`}>
+                {tab.title}
+              </span>
+              {tab.id === "cart" && cartCount > 0 ? (
+                <span className="absolute top-0 left-1/2 flex h-4 min-w-4 -translate-x-6 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-primary-foreground">
+                  {cartCount}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </nav>
 
       {compose && <ComposeSheet kind={compose} onClose={() => setCompose(null)} />}
     </div>
@@ -428,7 +495,7 @@ function AdminScreen() {
           }}
         >
           <Input name="name" required placeholder="الاسم" />
-          <Input name="phone" required placeholder="رقم الجوال" />
+          <Input name="phone" required placeholder="الإيميل" />
           <select name="role" className="h-11 rounded-lg border border-border bg-muted px-3 text-sm" defaultValue="resident">
             <option value="resident">نزلاوي</option>
             <option value="merchant">تاجر</option>
@@ -441,7 +508,7 @@ function AdminScreen() {
           <button className="min-w-0 flex-1 text-right" onClick={() => openMember(u.id)}>
             <p className="font-extrabold">{u.name}</p>
             <p className="text-xs text-muted-foreground">
-              {u.phone} · {u.banned ? "محظور" : u.role}
+              {u.email} · {u.banned ? "محظور" : u.role}
             </p>
           </button>
           <Button size="sm" variant="outline" onClick={() => banUser(u.id, !u.banned)}>

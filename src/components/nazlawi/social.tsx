@@ -162,7 +162,7 @@ function MemberProfile({ me, user }: { me: VillageUser; user: VillageUser }) {
           <p className="text-xl font-extrabold">{user.name}</p>
           <p className="text-sm text-muted-foreground">{roleAr[user.role]}</p>
           {showDetails && user.bio ? <p className="mt-2">{user.bio}</p> : null}
-          {showPhone ? <p className="mt-1 text-sm">{user.phone}</p> : null}
+          {showPhone ? <p className="mt-1 text-sm">{user.email || user.phone}</p> : null}
           {showDetails ? <p className="text-sm text-muted-foreground">{user.neighborhood}</p> : null}
         </div>
       </div>

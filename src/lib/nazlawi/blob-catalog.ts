@@ -1,6 +1,6 @@
 import { blobToken } from "./blob";
 
-const PATH = "nazlawi/market.json";
+const PATH = "nazlawi/market-v2.json";
 
 export type ShopRow = {
   id: string;

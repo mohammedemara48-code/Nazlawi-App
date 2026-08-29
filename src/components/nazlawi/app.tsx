@@ -39,7 +39,7 @@ export function NazlawiApp() {
     <div className="min-h-dvh bg-bg">
       {!liveUser ? <LoginScreen /> : <Shell />}
       {toast ? (
-        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+        <div className="fixed inset-x-0 bottom-24 z-50 flex justify-center px-4">
           <div className="rounded-full bg-ink px-4 py-2 text-sm text-primary-foreground shadow-lg">
             {toast}
           </div>
@@ -65,11 +65,7 @@ function LoginScreen() {
 
   return (
     <section className="relative mx-auto flex min-h-dvh max-w-lg flex-col overflow-hidden">
-      <img
-        src="/login-bg.jpg"
-        alt=""
-        className="absolute inset-0 size-full object-cover object-center"
-      />
+      <img src="/login-bg.jpg" alt="" className="absolute inset-0 size-full object-cover object-center" />
       <div className="absolute inset-0 bg-ink/55" />
       <div className="relative z-10 flex min-h-dvh flex-col px-6 pb-8 pt-[max(2.5rem,env(safe-area-inset-top))] text-primary-foreground">
         <p className="text-sm tracking-[0.35em]">NZLAWI</p>
@@ -107,35 +103,21 @@ function LoginScreen() {
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
-            login(
-              String(fd.get("name") ?? ""),
-              String(fd.get("phone") ?? ""),
-              String(fd.get("password") ?? ""),
-              role,
-            );
+            login(String(fd.get("email") ?? ""), String(fd.get("password") ?? ""), role);
           }}
         >
           <label className="text-sm font-medium">
-            الاسم
+            الإيميل
             <Input
-              name="name"
+              name="email"
+              type="email"
               required
               className="mt-1 border-0 bg-primary-foreground text-fg"
-              autoComplete="name"
+              autoComplete="email"
             />
           </label>
           <label className="text-sm font-medium">
-            رقم الجوال
-            <Input
-              name="phone"
-              required
-              inputMode="tel"
-              className="mt-1 border-0 bg-primary-foreground text-fg"
-              autoComplete="tel"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            كلمة السر
+            كلمة المرور
             <Input
               name="password"
               type="password"
