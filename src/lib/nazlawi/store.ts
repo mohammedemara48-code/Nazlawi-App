@@ -305,7 +305,7 @@ export const useNazlawi = create<NazlawiState>()(
       updateMe: (patch) => {
         const me = get().currentUser;
         if (!me) return;
-        const user = { ...me, ...patch, id: me.id, role: me.role, phone: me.phone };
+        const user = { ...me, ...patch, id: me.id, role: me.role };
         set((s) => ({
           currentUser: user,
           users: s.users.map((u) => (u.id === me.id ? user : u)),
