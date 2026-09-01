@@ -20,6 +20,8 @@ const config = {
 };
 
 let recaptcha: RecaptchaVerifier | null = null;
+let sendingCode = false;
+let recaptchaSeq = 0;
 
 export function firebaseReady() {
   return Boolean(config.apiKey && config.appId);
@@ -45,7 +47,7 @@ export async function signInWithGmail() {
   return cred.user;
 }
 
-function resetRecaptcha(auth: Auth) {
+function destroyRecaptcha() {
   try {
     recaptcha?.clear();
   } catch {
@@ -54,23 +56,35 @@ function resetRecaptcha(auth: Auth) {
   recaptcha = null;
   const host = document.getElementById("nazlawi-recaptcha");
   if (host) host.replaceChildren();
-  recaptcha = new RecaptchaVerifier(auth, "nazlawi-recaptcha", { size: "invisible" });
+}
+
+function createRecaptcha(auth: Auth) {
+  destroyRecaptcha();
+  const host = document.getElementById("nazlawi-recaptcha");
+  if (!host) throw new Error("recaptcha");
+  recaptchaSeq += 1;
+  const slot = document.createElement("div");
+  slot.id = `nazlawi-recaptcha-${recaptchaSeq}`;
+  host.appendChild(slot);
+  recaptcha = new RecaptchaVerifier(auth, slot.id, { size: "invisible" });
   return recaptcha;
 }
 
 export async function sendPhoneCode(e164: string) {
   const auth = firebaseAuth();
   if (!auth) throw new Error("firebase");
-  if (!document.getElementById("nazlawi-recaptcha")) throw new Error("recaptcha");
+  if (sendingCode) return Promise.reject(new Error("wait"));
+  sendingCode = true;
   try {
-    if (!recaptcha) recaptcha = new RecaptchaVerifier(auth, "nazlawi-recaptcha", { size: "invisible" });
-    return await signInWithPhoneNumber(auth, e164, recaptcha);
+    return await signInWithPhoneNumber(auth, e164, recaptcha ?? createRecaptcha(auth));
   } catch (err) {
-    const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
-    if (msg.includes("recaptcha") || msg.includes("already been rendered")) {
-      return signInWithPhoneNumber(auth, e164, resetRecaptcha(auth));
+    const text = `${err instanceof Error ? err.message : String(err)}`.toLowerCase();
+    if (text.includes("already been rendered") || text.includes("recaptcha")) {
+      return signInWithPhoneNumber(auth, e164, createRecaptcha(auth));
     }
     throw err;
+  } finally {
+    sendingCode = false;
   }
 }
 
@@ -106,7 +120,8 @@ export function toE164(dial: string, local: string) {
 
 export function firebaseError(err: unknown) {
   const code = typeof err === "object" && err && "code" in err ? String((err as { code: string }).code) : "";
-  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  const msg = `${err instanceof Error ? err.message : String(err)} ${code}`.toLowerCase();
+  if (msg.includes("wait")) return "الكود بيتبعت دلوقتي";
   if (code.includes("popup-closed")) return "اتقفل تسجيل جيميل";
   if (code.includes("invalid-phone")) return "رقم الجوال غلط";
   if (code.includes("invalid-verification")) return "كود التحقق غلط";
@@ -114,7 +129,7 @@ export function firebaseError(err: unknown) {
   if (code.includes("quota") || code.includes("billing")) return "الرسائل خلصت النهاردة أو محتاجة فاتورة";
   if (code.includes("unauthorized-domain")) return "ضيف الدومين في Authorized domains";
   if (code.includes("operation-not-allowed")) return "اضغط Save في SMS region policy";
-  if (msg.includes("recaptcha") || msg.includes("already been rendered")) return "اضغط إرسال الكود مرة واحدة كمان";
+  if (msg.includes("already been rendered") || msg.includes("recaptcha")) return "اضغط إرسال الكود مرة كمان";
   if (code.includes("api-key") || code.includes("invalid-api") || err instanceof Error && err.message === "firebase") {
     return "ضيف إعدادات ويب Firebase";
   }
