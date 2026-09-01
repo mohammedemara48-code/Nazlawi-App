@@ -72,12 +72,20 @@ const ICONS: Record<ScreenId, typeof UserRound> = {
   admin: Shield,
 };
 
-const TAB: { id: ScreenId; title: string }[] = [
+const CONSUMER_TAB: { id: ScreenId; title: string }[] = [
   { id: "home", title: "الرئيسية" },
   { id: "categories", title: "الفئات" },
   { id: "offers", title: "عروض" },
   { id: "profile", title: "الحساب" },
   { id: "cart", title: "العربة" },
+];
+
+const MERCHANT_TAB: { id: ScreenId; title: string }[] = [
+  { id: "market", title: "متجري" },
+  { id: "timeline", title: "قريتي" },
+  { id: "offers", title: "عروض" },
+  { id: "profile", title: "الحساب" },
+  { id: "people", title: "المشتركين" },
 ];
 
 type ComposeKind = "post" | "product" | "carpool" | "ride" | "service";
@@ -90,12 +98,10 @@ export function Shell() {
   const user = useNazlawi((s) => s.currentUser);
   const role = user?.role ?? "resident";
   const cartCount = useNazlawi((s) => s.cart.reduce((n, i) => n + i.qty, 0));
-  const shopMode = useNazlawi((s) => s.shopMode);
-  const setShopMode = useNazlawi((s) => s.setShopMode);
-  const setShopId = useNazlawi((s) => s.setShopId);
   const [open, setOpen] = useState(false);
   const [compose, setCompose] = useState<ComposeKind | null>(null);
   const items = NAV.filter((n) => canEnter(role, n.id));
+  const tabs = role === "merchant" ? MERCHANT_TAB : CONSUMER_TAB;
   const title = items.find((n) => n.id === screen)?.title ?? "نزلاوي";
   const showFab =
     canPublish(role, screen) &&
@@ -106,7 +112,10 @@ export function Shell() {
     screen !== "offers";
 
   useEffect(() => {
-    if (user && !canEnter(role, screen)) setScreen("home");
+    if (user && !canEnter(role, screen)) setScreen(role === "merchant" ? "market" : "home");
+    if (user && role === "merchant" && (screen === "home" || screen === "cart" || screen === "categories")) {
+      setScreen("market");
+    }
   }, [user, role, screen, setScreen]);
 
   return (
@@ -116,21 +125,7 @@ export function Shell() {
           <Menu className="size-5" />
         </Button>
         <div className="min-w-0 flex-1 text-center">
-          {user && (user.role === "merchant" || user.role === "admin") ? (
-            <button
-              className="mx-auto rounded-full bg-secondary px-3 py-1 text-xs font-extrabold text-secondary-foreground"
-              onClick={() => {
-                const next = shopMode === "store" ? "browse" : "store";
-                setShopMode(next);
-                if (next === "store") setScreen("market");
-                else setShopId(null);
-              }}
-            >
-              {shopMode === "store" ? "عرض متجري" : "تسوق كمستهلك"}
-            </button>
-          ) : (
-            <p className="truncate font-extrabold">{title}</p>
-          )}
+          <p className="truncate font-extrabold">{role === "merchant" ? "متجري" : title}</p>
         </div>
         <Button
           variant="ghost"
@@ -231,10 +226,10 @@ export function Shell() {
       )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-lg items-end justify-between border-t border-border bg-card/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
-        {TAB.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = ICONS[tab.id];
           const active = screen === tab.id;
-          const featured = tab.id === "offers";
+          const featured = tab.id === (role === "merchant" ? "market" : "offers");
           return (
             <button
               key={tab.id}

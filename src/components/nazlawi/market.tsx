@@ -33,7 +33,6 @@ export function MarketScreen() {
   const me = useNazlawi((s) => s.currentUser);
   const shopId = useNazlawi((s) => s.shopId);
   const setShopId = useNazlawi((s) => s.setShopId);
-  const shopMode = useNazlawi((s) => s.shopMode);
   const setErrorToast = useNazlawi((s) => s.setToast);
   const [shops, setShops] = useState<ShopRow[]>([]);
   const [feed, setFeed] = useState<Awaited<ReturnType<typeof listMarketFeed>>>([]);
@@ -69,19 +68,19 @@ export function MarketScreen() {
   }
 
   useEffect(() => {
-    if (shopMode === "store" && !shopId && me && (me.role === "merchant" || me.role === "admin")) {
+    if (!shopId && me && (me.role === "merchant" || me.role === "admin")) {
       void openMyShop();
     }
-  }, [shopMode, shopId, me?.id]);
+  }, [shopId, me?.id]);
+
+  if (me && (me.role === "merchant" || me.role === "admin") && !shopId) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">جاري فتح متجرك</p>;
+  }
 
   if (shopId) return <ShopPage shopId={shopId} onBack={() => setShopId(null)} />;
 
   return (
     <div className="flex flex-col gap-3">
-      {me && (me.role === "merchant" || me.role === "admin") && shopMode === "store" ? (
-        <Button onClick={() => void openMyShop()}>لوحة متجري</Button>
-      ) : null}
-
       {feed.map((post) => (
         <button
           key={post.id}
@@ -125,7 +124,6 @@ export function MarketScreen() {
 
 function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const me = useNazlawi((s) => s.currentUser);
-  const shopMode = useNazlawi((s) => s.shopMode);
   const setToast = useNazlawi((s) => s.setToast);
   const addToCart = useNazlawi((s) => s.addToCart);
   const [shop, setShop] = useState<ShopRow | null>(null);
@@ -143,7 +141,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const [filter, setFilter] = useState("");
   const key = merchantKey(me?.email, me?.phone);
   const owner = Boolean(me && shop && (me.email === shop.merchant_phone || me.phone === shop.merchant_phone));
-  const manage = owner && shopMode === "store";
+  const manage = owner;
 
   async function reload(nextOffset = 0) {
     try {
@@ -168,7 +166,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
 
   useEffect(() => {
     void reload(0);
-  }, [shopId, me?.email, shopMode]);
+  }, [shopId, me?.email]);
 
   const total = useMemo(() => {
     return products.reduce((sum, p) => sum + (cart[p.id] ?? 0) * Number(p.price), 0);
@@ -180,9 +178,11 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <button className="self-start text-sm font-bold text-primary" onClick={onBack}>
-        السوق
-      </button>
+      {owner ? null : (
+        <button className="self-start text-sm font-bold text-primary" onClick={onBack}>
+          السوق
+        </button>
+      )}
       {shop.promo_video_url ? (
         <video src={shop.promo_video_url} className="h-52 w-full rounded-3xl bg-ink object-cover" controls playsInline />
       ) : shop.cover_url ? (

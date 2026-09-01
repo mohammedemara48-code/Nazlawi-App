@@ -184,7 +184,8 @@ export const useNazlawi = create<NazlawiState>()(
           set((s) => ({
             currentUser: user,
             users: s.users.map((u) => (u.id === user.id ? user : u)),
-            screen: "home",
+            screen: user.role === "merchant" ? "market" : "home",
+            shopMode: user.role === "merchant" ? "store" : "browse",
             toast: null,
           }));
           return;
@@ -207,7 +208,8 @@ export const useNazlawi = create<NazlawiState>()(
         set((s) => ({
           currentUser: user,
           users: [...s.users, user],
-          screen: "home",
+          screen: nextRole === "merchant" ? "market" : "home",
+          shopMode: nextRole === "merchant" ? "store" : "browse",
           toast: null,
         }));
       },
