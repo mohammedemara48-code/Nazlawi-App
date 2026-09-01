@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Camera, Heart, ImageIcon, MessageCircle, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Flag, Heart, ImageIcon, MessageCircle, Pencil, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,11 +61,18 @@ export function CommentBox({
 }
 
 export function PostCard({ post }: { post: TimelinePost }) {
+  const me = useNazlawi((s) => s.currentUser);
   const users = useNazlawi((s) => s.users);
   const likePost = useNazlawi((s) => s.likePost);
   const commentPost = useNazlawi((s) => s.commentPost);
   const openMember = useNazlawi((s) => s.openMember);
+  const editPost = useNazlawi((s) => s.editPost);
+  const deletePost = useNazlawi((s) => s.deletePost);
+  const reportPost = useNazlawi((s) => s.reportPost);
+  const [editing, setEditing] = useState(false);
+  const [caption, setCaption] = useState(post.caption ?? "");
   const author = users.find((u) => u.id === post.authorId);
+  const mine = me?.id === post.authorId || me?.role === "admin";
   return (
     <Card className="p-4">
       <button className="flex items-center gap-3" onClick={() => openMember(post.authorId)}>
@@ -77,16 +84,48 @@ export function PostCard({ post }: { post: TimelinePost }) {
           </p>
         </div>
       </button>
-      {post.caption ? <p className="mt-3 leading-7">{post.caption}</p> : null}
+      {editing ? (
+        <form
+          className="mt-3 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            editPost(post.id, caption);
+            setEditing(false);
+          }}
+        >
+          <Input value={caption} onChange={(e) => setCaption(e.target.value)} />
+          <Button type="submit" size="sm">
+            حفظ
+          </Button>
+        </form>
+      ) : post.caption ? (
+        <p className="mt-3 leading-7">{post.caption}</p>
+      ) : null}
       {post.mediaUrl && post.type === "photo" ? (
         <img src={post.mediaUrl} alt="" className="mt-3 w-full rounded-lg object-cover" />
       ) : null}
       {post.mediaUrl && post.type === "video" ? (
         <video src={post.mediaUrl} controls className="mt-3 w-full rounded-lg" />
       ) : null}
-      <button className="mt-3 flex items-center gap-2 text-sm text-coral" onClick={() => likePost(post.id)}>
-        <Heart className="size-4" /> {post.likes}
-      </button>
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+        <button className="flex items-center gap-2 text-coral" onClick={() => likePost(post.id)}>
+          <Heart className="size-4" /> {post.likes}
+        </button>
+        {mine ? (
+          <>
+            <button className="flex items-center gap-1" onClick={() => setEditing(true)}>
+              <Pencil className="size-4" /> تعديل
+            </button>
+            <button className="flex items-center gap-1" onClick={() => deletePost(post.id)}>
+              <Trash2 className="size-4" /> حذف
+            </button>
+          </>
+        ) : (
+          <button className="flex items-center gap-1" onClick={() => reportPost(post.id)}>
+            <Flag className="size-4" /> إبلاغ
+          </button>
+        )}
+      </div>
       <CommentBox items={post.comments} onSend={(t) => commentPost(post.id, t)} />
     </Card>
   );
@@ -142,12 +181,16 @@ function MemberProfile({ me, user }: { me: VillageUser; user: VillageUser }) {
   const answerFriend = useNazlawi((s) => s.answerFriend);
   const openChat = useNazlawi((s) => s.openChat);
   const banUser = useNazlawi((s) => s.banUser);
+  const followMerchant = useNazlawi((s) => s.followMerchant);
+  const follows = useNazlawi((s) => s.follows);
   const link = friendLink(friends, me.id, user.id);
   const friend = areFriends(friends, me.id, user.id);
   const incoming = link?.status === "pending" && link.toId === me.id;
   const outgoing = link?.status === "pending" && link.fromId === me.id;
   const showPhone = user.showPhone || me.role === "admin" || friend;
   const showDetails = user.showDetails || me.role === "admin" || friend || me.id === user.id;
+  const merchantKey = user.email || user.phone || user.id;
+  const following = follows.some((f) => f.followerId === me.id && f.merchantKey === merchantKey);
 
   return (
     <div className="flex flex-col gap-3">
@@ -186,6 +229,11 @@ function MemberProfile({ me, user }: { me: VillageUser; user: VillageUser }) {
           ) : (
             <Button onClick={() => requestFriend(user.id)}>إضافة</Button>
           )}
+          {user.role === "merchant" ? (
+            <Button variant={following ? "secondary" : "default"} onClick={() => followMerchant(merchantKey)}>
+              {following ? "إلغاء المتابعة" : "متابعة التاجر"}
+            </Button>
+          ) : null}
           {me.role === "admin" ? (
             <Button variant="outline" onClick={() => banUser(user.id, !user.banned)}>
               {user.banned ? "فك الحظر" : "حظر"}
@@ -206,7 +254,13 @@ export function ProfileScreen() {
   return (
     <div className="flex flex-col gap-3">
       <MemberProfile me={me} user={me} />
-      <Button variant="outline" onClick={logout}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          void import("@/lib/nazlawi/firebase").then((m) => m.firebaseLogout());
+          logout();
+        }}
+      >
         تسجيل الخروج
       </Button>
     </div>

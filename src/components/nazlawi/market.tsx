@@ -25,7 +25,7 @@ import {
 import { useNazlawi } from "@/lib/nazlawi/store";
 import { MerchantDashboard } from "./merchant";
 
-function merchantKey(email?: string, phone?: string) {
+function accountKey(email?: string, phone?: string) {
   return email || phone || "";
 }
 
@@ -55,7 +55,7 @@ export function MarketScreen() {
     if (!me || (me.role !== "merchant" && me.role !== "admin")) return;
     try {
       const shop = await ensureShop({
-        data: { phone: merchantKey(me.email, me.phone), name: me.name, userId: me.id },
+        data: { phone: accountKey(me.email, me.phone), name: me.name, userId: me.id },
       });
       if (shop?.id) {
         setShopId(shop.id);
@@ -126,6 +126,8 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const me = useNazlawi((s) => s.currentUser);
   const setToast = useNazlawi((s) => s.setToast);
   const addToCart = useNazlawi((s) => s.addToCart);
+  const followMerchant = useNazlawi((s) => s.followMerchant);
+  const follows = useNazlawi((s) => s.follows);
   const [shop, setShop] = useState<ShopRow | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [offers, setOffers] = useState<OfferRow[]>([]);
@@ -139,9 +141,13 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [filter, setFilter] = useState("");
-  const key = merchantKey(me?.email, me?.phone);
+  const key = accountKey(me?.email, me?.phone);
   const owner = Boolean(me && shop && (me.email === shop.merchant_phone || me.phone === shop.merchant_phone));
   const manage = owner;
+  const shopFollowKey = shop?.user_id || shop?.merchant_phone || "";
+  const following = Boolean(
+    me && shopFollowKey && follows.some((f) => f.followerId === me.id && f.merchantKey === shopFollowKey),
+  );
 
   async function reload(nextOffset = 0) {
     try {
@@ -195,6 +201,11 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
           <Phone className="size-4" />
           {shop.merchant_phone}
         </a>
+        {!owner && me ? (
+          <Button className="mt-3" variant={following ? "secondary" : "default"} onClick={() => followMerchant(shopFollowKey)}>
+            {following ? "إلغاء المتابعة" : "متابعة التاجر"}
+          </Button>
+        ) : null}
       </div>
 
       {feed.length ? (
@@ -364,7 +375,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                 data: {
                   shopId: shop.id,
                   buyerName: me.name,
-                  buyerPhone: merchantKey(me.email, me.phone),
+                  buyerPhone: accountKey(me.email, me.phone),
                   pickupAt: pickup,
                   items: picked,
                 },

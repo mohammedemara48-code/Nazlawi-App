@@ -216,7 +216,10 @@ export function Shell() {
             </nav>
             <button
               className="flex items-center gap-3 border-t border-border px-5 py-4 text-coral"
-              onClick={logout}
+              onClick={() => {
+                void import("@/lib/nazlawi/firebase").then((m) => m.firebaseLogout());
+                logout();
+              }}
             >
               <LogOut className="size-5" />
               تسجيل الخروج

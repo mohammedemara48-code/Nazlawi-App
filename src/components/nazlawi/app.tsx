@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
+import type { ConfirmationResult } from "firebase/auth";
 import { Store, UserRound } from "lucide-react";
 import { useNazlawi } from "@/lib/nazlawi/store";
+import {
+  COUNTRIES,
+  confirmPhoneCode,
+  firebaseError,
+  sendPhoneCode,
+  signInWithGmail,
+  toE164,
+} from "@/lib/nazlawi/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shell } from "./shell";
@@ -51,8 +60,15 @@ export function NazlawiApp() {
 
 function LoginScreen() {
   const login = useNazlawi((s) => s.login);
+  const loginFromAuth = useNazlawi((s) => s.loginFromAuth);
+  const setToast = useNazlawi((s) => s.setToast);
   const [role, setRole] = useState<"resident" | "merchant">("resident");
   const [busy, setBusy] = useState(false);
+  const [dial, setDial] = useState("+966");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmationResult | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   async function installApp() {
     setBusy(true);
@@ -60,6 +76,54 @@ function LoginScreen() {
       window as Window & { __nazlawiInstall?: { prompt: () => Promise<void> } }
     ).__nazlawiInstall;
     if (prompt) await prompt.prompt();
+    setBusy(false);
+  }
+
+  async function gmail() {
+    setBusy(true);
+    try {
+      const user = await signInWithGmail();
+      loginFromAuth({
+        email: user.email ?? "",
+        name: user.displayName ?? "",
+        uid: user.uid,
+        phone: user.phoneNumber ?? "",
+        role,
+      });
+    } catch (err) {
+      setToast(firebaseError(err));
+    }
+    setBusy(false);
+  }
+
+  async function sendSms() {
+    setBusy(true);
+    try {
+      const e164 = toE164(dial, phone);
+      const next = await sendPhoneCode(e164);
+      setConfirm(next);
+      setToast("اتبعت كود التحقق");
+    } catch (err) {
+      setToast(firebaseError(err));
+    }
+    setBusy(false);
+  }
+
+  async function verifySms() {
+    if (!confirm) return;
+    setBusy(true);
+    try {
+      const user = await confirmPhoneCode(confirm, code);
+      loginFromAuth({
+        email: user.email ?? "",
+        phone: user.phoneNumber ?? toE164(dial, phone),
+        name: user.displayName ?? "",
+        uid: user.uid,
+        role,
+      });
+    } catch (err) {
+      setToast(firebaseError(err));
+    }
     setBusy(false);
   }
 
@@ -98,51 +162,83 @@ function LoginScreen() {
           </button>
         </div>
 
-        <form
-          className="mt-8 flex flex-1 flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.currentTarget);
-            login(String(fd.get("email") ?? ""), String(fd.get("password") ?? ""), role);
-          }}
-        >
-          <label className="text-sm font-medium">
-            الإيميل
-            <Input
-              name="email"
-              type="email"
-              required
-              className="mt-1 border-0 bg-primary-foreground text-fg"
-              autoComplete="email"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            كلمة المرور
-            <Input
-              name="password"
-              type="password"
-              required
-              minLength={4}
-              className="mt-1 border-0 bg-primary-foreground text-fg"
-              autoComplete="current-password"
-            />
-          </label>
-          <div className="mt-auto flex flex-col gap-2">
-            <Button type="submit" size="lg" className="w-full">
-              دخول
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant="secondary"
-              className="w-full"
-              disabled={busy}
-              onClick={() => void installApp()}
-            >
-              تحميل التطبيق
-            </Button>
+        <div className="mt-8 flex flex-1 flex-col gap-3">
+          <Button type="button" size="lg" className="w-full" disabled={busy} onClick={() => void gmail()}>
+            الدخول بجيميل
+          </Button>
+
+          <div className="flex items-center gap-2 text-xs text-primary-foreground/70">
+            <span className="h-px flex-1 bg-primary-foreground/30" />
+            الجوال
+            <span className="h-px flex-1 bg-primary-foreground/30" />
           </div>
-        </form>
+
+          <div className="flex gap-2">
+            <select
+              value={dial}
+              onChange={(e) => setDial(e.target.value)}
+              className="h-10 rounded-md border-0 bg-primary-foreground px-2 text-sm text-fg"
+              aria-label="مفتاح الدولة"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.iso} value={c.dial}>
+                  {c.name} {c.dial}
+                </option>
+              ))}
+            </select>
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              placeholder="رقم الجوال"
+              className="border-0 bg-primary-foreground text-fg"
+            />
+          </div>
+          {confirm ? (
+            <>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                inputMode="numeric"
+                placeholder="كود التحقق"
+                className="border-0 bg-primary-foreground text-fg"
+              />
+              <Button type="button" size="lg" disabled={busy || code.length < 4} onClick={() => void verifySms()}>
+                تأكيد الرمز
+              </Button>
+            </>
+          ) : (
+            <Button type="button" size="lg" variant="secondary" disabled={busy || phone.length < 7} onClick={() => void sendSms()}>
+              إرسال كود التحقق
+            </Button>
+          )}
+
+          <div id="nazlawi-recaptcha" />
+
+          <button type="button" className="text-sm underline" onClick={() => setEmailOpen((v) => !v)}>
+            دخول بالإيميل
+          </button>
+          {emailOpen ? (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                login(String(fd.get("email") ?? ""), String(fd.get("password") ?? ""), role);
+              }}
+            >
+              <Input name="email" type="email" required placeholder="الإيميل" className="border-0 bg-primary-foreground text-fg" />
+              <Input name="password" type="password" required minLength={4} placeholder="كلمة المرور" className="border-0 bg-primary-foreground text-fg" />
+              <Button type="submit" size="lg">
+                دخول
+              </Button>
+            </form>
+          ) : null}
+
+          <Button type="button" size="lg" variant="secondary" className="mt-auto" disabled={busy} onClick={() => void installApp()}>
+            تحميل التطبيق
+          </Button>
+        </div>
       </div>
     </section>
   );

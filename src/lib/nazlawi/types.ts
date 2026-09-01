@@ -29,6 +29,7 @@ export type Comment = {
 
 export type VillageUser = {
   id: string;
+  uid?: string;
   name: string;
   email: string;
   phone: string;
@@ -63,6 +64,18 @@ export type TimelinePost = {
   mediaUrl?: string;
   likes: number;
   comments: Comment[];
+  createdAt: string;
+};
+
+export type Follow = {
+  followerId: string;
+  merchantKey: string;
+};
+
+export type PostReport = {
+  id: string;
+  postId: string;
+  reporterId: string;
   createdAt: string;
 };
 
