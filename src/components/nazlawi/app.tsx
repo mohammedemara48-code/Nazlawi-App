@@ -68,6 +68,7 @@ function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [confirm, setConfirm] = useState<ConfirmationResult | null>(null);
+  const [otpStep, setOtpStep] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
 
   async function installApp() {
@@ -98,11 +99,13 @@ function LoginScreen() {
 
   async function sendSms() {
     setBusy(true);
+    setOtpStep(true);
+    setCode("");
     try {
       const e164 = toE164(dial, phone);
       const next = await sendPhoneCode(e164);
       setConfirm(next);
-      setToast("اتبعت كود التحقق");
+      setToast("اتكتب الكود اللي وصلك");
     } catch (err) {
       setToast(firebaseError(err));
     }
@@ -173,44 +176,75 @@ function LoginScreen() {
             <span className="h-px flex-1 bg-primary-foreground/30" />
           </div>
 
-          <div className="flex gap-2">
-            <select
-              value={dial}
-              onChange={(e) => setDial(e.target.value)}
-              className="h-10 rounded-md border-0 bg-primary-foreground px-2 text-sm text-fg"
-              aria-label="مفتاح الدولة"
-            >
-              {COUNTRIES.map((c) => (
-                <option key={c.iso} value={c.dial}>
-                  {c.name} {c.dial}
-                </option>
-              ))}
-            </select>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              inputMode="tel"
-              placeholder="رقم الجوال"
-              className="border-0 bg-primary-foreground text-fg"
-            />
-          </div>
-          {confirm ? (
-            <>
+          {otpStep ? (
+            <div className="rounded-3xl bg-ink/50 p-4 backdrop-blur-sm">
+              <p className="text-center text-sm text-primary-foreground/80">الكود اللي وصلك على</p>
+              <p className="mb-4 text-center text-lg font-extrabold" dir="ltr">
+                {toE164(dial, phone)}
+              </p>
               <Input
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 inputMode="numeric"
-                placeholder="كود التحقق"
-                className="border-0 bg-primary-foreground text-fg"
+                autoComplete="one-time-code"
+                autoFocus
+                placeholder="------"
+                className="h-14 border-0 bg-primary-foreground text-center text-2xl tracking-[0.4em] text-fg"
               />
-              <Button type="button" size="lg" disabled={busy || code.length < 4} onClick={() => void verifySms()}>
-                تأكيد الرمز
+              <Button
+                type="button"
+                size="lg"
+                className="mt-3 w-full"
+                disabled={busy || code.length < 4 || !confirm}
+                onClick={() => void verifySms()}
+              >
+                {busy ? "جاري التحقق" : "تأكيد الرمز"}
+              </Button>
+              <div className="mt-3 flex justify-between text-sm">
+                <button
+                  type="button"
+                  className="underline"
+                  disabled={busy}
+                  onClick={() => {
+                    setOtpStep(false);
+                    setConfirm(null);
+                    setCode("");
+                  }}
+                >
+                  تغيير الرقم
+                </button>
+                <button type="button" className="underline" disabled={busy} onClick={() => void sendSms()}>
+                  إعادة إرسال
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <select
+                  value={dial}
+                  onChange={(e) => setDial(e.target.value)}
+                  className="h-10 rounded-md border-0 bg-primary-foreground px-2 text-sm text-fg"
+                  aria-label="مفتاح الدولة"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.iso} value={c.dial}>
+                      {c.name} {c.dial}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  inputMode="tel"
+                  placeholder="رقم الجوال"
+                  className="border-0 bg-primary-foreground text-fg"
+                />
+              </div>
+              <Button type="button" size="lg" variant="secondary" disabled={busy || phone.length < 7} onClick={() => void sendSms()}>
+                {busy ? "جاري إرسال الكود" : "إرسال كود التحقق"}
               </Button>
             </>
-          ) : (
-            <Button type="button" size="lg" variant="secondary" disabled={busy || phone.length < 7} onClick={() => void sendSms()}>
-              إرسال كود التحقق
-            </Button>
           )}
 
           <div id="nazlawi-recaptcha" />
