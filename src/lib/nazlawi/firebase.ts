@@ -11,12 +11,12 @@ import {
 } from "firebase/auth";
 
 const config = {
-  apiKey: String(import.meta.env.VITE_FIREBASE_API_KEY ?? ""),
+  apiKey: String(import.meta.env.VITE_FIREBASE_API_KEY ?? "AIzaSyD8UCmGLRTV28msQ8MwC9esh-6PxlKSZqg"),
   authDomain: String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "nazlawi-app.firebaseapp.com"),
   projectId: String(import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "nazlawi-app"),
-  storageBucket: String(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "nazlawi-app.appspot.com"),
-  messagingSenderId: String(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? ""),
-  appId: String(import.meta.env.VITE_FIREBASE_APP_ID ?? ""),
+  storageBucket: String(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "nazlawi-app.firebasestorage.app"),
+  messagingSenderId: String(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "588724293394"),
+  appId: String(import.meta.env.VITE_FIREBASE_APP_ID ?? "1:588724293394:web:15de8bfe95592601a6edcb"),
 };
 
 let recaptcha: RecaptchaVerifier | null = null;
