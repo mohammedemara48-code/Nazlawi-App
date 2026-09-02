@@ -96,6 +96,7 @@ type NazlawiState = {
   reports: PostReport[];
   messages: ChatMessage[];
   cart: CartItem[];
+  cartRefs: Record<string, string>;
   currentUser: VillageUser | null;
   screen: ScreenId;
   memberId: string | null;
@@ -135,6 +136,8 @@ type NazlawiState = {
   answerFriend: (id: string, accept: boolean) => void;
   followMerchant: (merchantKey: string) => void;
   sendMessage: (text: string) => void;
+  sendShopCart: (merchantUserId: string, text: string) => void;
+  cartRefFor: (shopId: string) => string;
   clearToast: () => void;
   setToast: (msg: string | null) => void;
 };
@@ -154,6 +157,7 @@ export const useNazlawi = create<NazlawiState>()(
       reports: [],
       messages: [],
       cart: [],
+      cartRefs: {},
       currentUser: null,
       screen: "home",
       memberId: null,
@@ -591,6 +595,31 @@ export const useNazlawi = create<NazlawiState>()(
         };
         set((s) => ({ messages: [...s.messages, msg] }));
       },
+      cartRefFor: (shopId) => {
+        const existing = get().cartRefs[shopId];
+        if (existing) return existing;
+        const ref = `NZ-${shopId.slice(0, 4).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+        set((s) => ({ cartRefs: { ...s.cartRefs, [shopId]: ref } }));
+        return ref;
+      },
+      sendShopCart: (merchantUserId, text) => {
+        const me = get().currentUser;
+        if (!me || !merchantUserId || !text.trim()) return;
+        const msg: ChatMessage = {
+          id: nid(),
+          threadId: threadOf(me.id, merchantUserId),
+          senderId: me.id,
+          senderName: me.name,
+          text: text.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          messages: [...s.messages, msg],
+          chatWith: merchantUserId,
+          screen: "chat",
+          toast: "الحجز اتبعت للتاجر",
+        }));
+      },
       clearToast: () => set({ toast: null }),
       setToast: (msg) => set({ toast: msg }),
     }),
@@ -610,6 +639,7 @@ export const useNazlawi = create<NazlawiState>()(
         reports: s.reports,
         messages: s.messages,
         cart: s.cart,
+        cartRefs: s.cartRefs,
         currentUser: s.currentUser,
         screen: s.screen,
         shopMode: s.shopMode,

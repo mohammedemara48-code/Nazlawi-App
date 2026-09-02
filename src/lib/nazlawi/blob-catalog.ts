@@ -11,6 +11,9 @@ export type ShopRow = {
   cover_url: string | null;
   promo_video_url: string | null;
   user_id: string;
+  avatar_url: string | null;
+  store_phone: string;
+  bio: string;
 };
 
 export type CategoryRow = {
@@ -36,6 +39,18 @@ export type OfferRow = {
   shop_id: string;
   title: string;
   detail: string;
+  photos: string[];
+};
+
+export type FeedRow = {
+  id: string;
+  shop_id: string;
+  title: string;
+  body: string;
+  photo_url: string | null;
+  photos: string[];
+  kind: "market" | "deal";
+  created_at: string;
 };
 
 export type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
@@ -63,15 +78,6 @@ export type CommentRow = {
   product_id: string;
   author_name: string;
   text: string;
-};
-
-export type FeedRow = {
-  id: string;
-  shop_id: string;
-  title: string;
-  body: string;
-  photo_url: string | null;
-  created_at: string;
 };
 
 export type MarketDB = {
@@ -108,6 +114,9 @@ function hydrate(json: Partial<MarketDB>): MarketDB {
       ...s,
       promo_video_url: s.promo_video_url ?? null,
       user_id: s.user_id || s.merchant_phone,
+      avatar_url: s.avatar_url ?? null,
+      store_phone: s.store_phone || (s.merchant_phone?.includes("@") ? "" : s.merchant_phone) || "",
+      bio: s.bio ?? "",
     })),
     products: (json.products ?? []).map((p) => ({
       ...p,
@@ -115,12 +124,16 @@ function hydrate(json: Partial<MarketDB>): MarketDB {
       qty: Number(p.qty ?? 0),
       created_at: p.created_at || new Date().toISOString(),
     })),
-    offers: json.offers ?? [],
+    offers: (json.offers ?? []).map((o) => ({ ...o, photos: o.photos ?? [] })),
     orders: json.orders ?? [],
     items: json.items ?? [],
     comments: json.comments ?? [],
     categories: json.categories ?? [],
-    feed: json.feed ?? [],
+    feed: (json.feed ?? []).map((f) => ({
+      ...f,
+      photos: f.photos?.length ? f.photos : f.photo_url ? [f.photo_url] : [],
+      kind: f.kind === "deal" ? "deal" : "market",
+    })),
   };
 }
 

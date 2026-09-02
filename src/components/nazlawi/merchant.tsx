@@ -9,6 +9,7 @@ import {
   addShopProduct,
   setShopOrderStatus,
   setShopPromo,
+  updateShopLook,
   type CategoryRow,
   type OrderItemRow,
   type OrderRow,
@@ -45,7 +46,8 @@ export function MerchantDashboard({
   const videoRef = useRef<HTMLInputElement>(null);
   const feedRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState("");
-  const [feedPhoto, setFeedPhoto] = useState("");
+  const [feedPhotos, setFeedPhotos] = useState<string[]>([]);
+  const [kind, setKind] = useState<"market" | "deal">("market");
   if (!me) return null;
   const key = me.email || me.phone;
 
@@ -77,20 +79,62 @@ export function MerchantDashboard({
       </Card>
 
       <Card className="space-y-3 p-4">
-        <p className="font-extrabold">منشور السوق</p>
-        <p className="text-sm text-muted-foreground">يظهر مباشرة في تبويب السوق ويربط بمتجرك</p>
+        <p className="font-extrabold">هوية المتجر</p>
         <form
           className="space-y-2"
           onSubmit={async (e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
+            await updateShopLook({
+              data: {
+                shopId: shop.id,
+                phone: key,
+                title: String(fd.get("title") ?? ""),
+                bio: String(fd.get("bio") ?? ""),
+                storePhone: String(fd.get("tel") ?? ""),
+              },
+            });
+            setToast("تم");
+            onChanged();
+          }}
+        >
+          <Input name="title" defaultValue={shop.title} placeholder="اسم المتجر" />
+          <Input name="tel" defaultValue={shop.store_phone} placeholder="تليفون المتجر" />
+          <Input name="bio" defaultValue={shop.bio} placeholder="نبذة عن المتجر" />
+          <Button type="submit" className="w-full">
+            حفظ البيانات
+          </Button>
+        </form>
+      </Card>
+
+      <Card className="space-y-3 p-4">
+        <p className="font-extrabold">منشور السوق أو العرض</p>
+        <p className="text-sm text-muted-foreground">٣ صور + نبذة. الضغط عليه يفتح متجرك</p>
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant={kind === "market" ? "default" : "secondary"} onClick={() => setKind("market")}>
+            السوق
+          </Button>
+          <Button type="button" size="sm" variant={kind === "deal" ? "default" : "secondary"} onClick={() => setKind("deal")}>
+            العروض
+          </Button>
+        </div>
+        <form
+          className="space-y-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            if (feedPhotos.length !== 3) {
+              setToast("لازم ٣ صور");
+              return;
+            }
             const res = await addShopFeed({
               data: {
                 shopId: shop.id,
                 phone: key,
                 title: String(fd.get("title") ?? ""),
                 body: String(fd.get("body") ?? ""),
-                photoUrl: feedPhoto || undefined,
+                photos: feedPhotos.slice(0, 3),
+                kind,
               },
             });
             if (!res.ok) {
@@ -98,13 +142,13 @@ export function MerchantDashboard({
               return;
             }
             e.currentTarget.reset();
-            setFeedPhoto("");
-            setToast("ظهر في السوق");
+            setFeedPhotos([]);
+            setToast(kind === "deal" ? "ظهر في العروض" : "ظهر في السوق");
             onChanged();
           }}
         >
           <Input name="title" required placeholder="عنوان المنشور" />
-          <Input name="body" placeholder="التفاصيل" />
+          <Input name="body" placeholder="نبذة مختصرة" />
           <input
             ref={feedRef}
             type="file"
@@ -113,17 +157,27 @@ export function MerchantDashboard({
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file) return;
+              if (feedPhotos.length >= 3) {
+                setToast("٣ صور بس");
+                return;
+              }
               const up = await uploadCompressedImage(file);
-              if (up.ok) setFeedPhoto(up.url);
+              if (up.ok) setFeedPhotos((p) => [...p, up.url].slice(0, 3));
               else setToast(up.error ?? "التخزين مش جاهز");
             }}
           />
           <Button type="button" variant="secondary" onClick={() => feedRef.current?.click()}>
-            صورة المنشور
+            صورة {feedPhotos.length}/3
           </Button>
-          {feedPhoto ? <img src={feedPhoto} alt="" className="h-24 rounded-lg object-cover" /> : null}
+          {feedPhotos.length ? (
+            <div className="grid grid-cols-3 gap-2">
+              {feedPhotos.map((src) => (
+                <img key={src} src={src} alt="" className="h-20 w-full rounded-lg object-cover" />
+              ))}
+            </div>
+          ) : null}
           <Button type="submit" className="w-full">
-            نشر في السوق
+            نشر
           </Button>
         </form>
       </Card>

@@ -29,11 +29,53 @@ function accountKey(email?: string, phone?: string) {
   return email || phone || "";
 }
 
+function publicPhone(shop: { store_phone?: string; merchant_phone: string }) {
+  if (shop.store_phone) return shop.store_phone;
+  return shop.merchant_phone.includes("@") ? "" : shop.merchant_phone;
+}
+
+function ImageSlider({ photos }: { photos: string[] }) {
+  const [i, setI] = useState(0);
+  const shots = photos.filter(Boolean).slice(0, 3);
+  if (!shots.length) return null;
+  return (
+    <div className="relative">
+      <img src={shots[i]} alt="" className="h-44 w-full object-cover" />
+      {shots.length > 1 ? (
+        <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
+          {shots.map((_, n) => (
+            <button
+              key={n}
+              className={`h-1.5 rounded-full ${n === i ? "w-5 bg-white" : "w-1.5 bg-white/50"}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setI(n);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+      {shots.length > 1 ? (
+        <button
+          className="absolute inset-y-0 left-0 w-1/3"
+          aria-label="التالي"
+          onClick={(e) => {
+            e.stopPropagation();
+            setI((n) => (n + 1) % shots.length);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function MarketScreen() {
   const me = useNazlawi((s) => s.currentUser);
   const shopId = useNazlawi((s) => s.shopId);
   const setShopId = useNazlawi((s) => s.setShopId);
   const setErrorToast = useNazlawi((s) => s.setToast);
+  const followMerchant = useNazlawi((s) => s.followMerchant);
+  const follows = useNazlawi((s) => s.follows);
   const [shops, setShops] = useState<ShopRow[]>([]);
   const [feed, setFeed] = useState<Awaited<ReturnType<typeof listMarketFeed>>>([]);
 
@@ -81,20 +123,36 @@ export function MarketScreen() {
 
   return (
     <div className="flex flex-col gap-3">
-      {feed.map((post) => (
-        <button
-          key={post.id}
-          className="overflow-hidden rounded-2xl bg-card text-right shadow-sm"
-          onClick={() => post.shop?.id && setShopId(post.shop.id)}
-        >
-          {post.photo_url ? <img src={post.photo_url} alt="" className="h-36 w-full object-cover" /> : null}
-          <div className="p-4">
-            <p className="font-extrabold">{post.title}</p>
-            {post.body ? <p className="text-sm text-muted-foreground">{post.body}</p> : null}
-            <p className="mt-2 text-sm font-bold text-primary">{post.shop?.title ?? "المتجر"}</p>
+      {feed.map((post) => {
+        const key = post.shop?.user_id || post.shop?.merchant_phone || "";
+        const following = Boolean(me && key && follows.some((f) => f.followerId === me.id && f.merchantKey === key));
+        const photos = post.photos?.length ? post.photos : post.photo_url ? [post.photo_url] : [];
+        return (
+          <div key={post.id} className="overflow-hidden rounded-2xl bg-card text-right shadow-sm">
+            <div className="flex items-center justify-between px-4 pt-3">
+              <button className="font-extrabold" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
+                {post.shop?.title ?? "المتجر"}
+              </button>
+              {me && key ? (
+                <Button
+                  size="sm"
+                  variant={following ? "secondary" : "default"}
+                  onClick={() => followMerchant(key)}
+                >
+                  {following ? "متابعة" : "اهتمام بالمتجر"}
+                </Button>
+              ) : null}
+            </div>
+            <button className="w-full text-right" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
+              <ImageSlider photos={photos} />
+              <div className="p-4">
+                <p className="font-extrabold">{post.title}</p>
+                <p className="text-sm text-muted-foreground">{post.body || post.shop?.bio}</p>
+              </div>
+            </button>
           </div>
-        </button>
-      ))}
+        );
+      })}
 
       {shops.map((shop) => (
         <button
@@ -128,6 +186,8 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
   const addToCart = useNazlawi((s) => s.addToCart);
   const followMerchant = useNazlawi((s) => s.followMerchant);
   const follows = useNazlawi((s) => s.follows);
+  const cartRefFor = useNazlawi((s) => s.cartRefFor);
+  const sendShopCart = useNazlawi((s) => s.sendShopCart);
   const [shop, setShop] = useState<ShopRow | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [offers, setOffers] = useState<OfferRow[]>([]);
@@ -189,18 +249,32 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
           السوق
         </button>
       )}
-      {shop.promo_video_url ? (
-        <video src={shop.promo_video_url} className="h-52 w-full rounded-3xl bg-ink object-cover" controls playsInline />
-      ) : shop.cover_url ? (
+      {shop.cover_url ? (
         <img src={shop.cover_url} alt="" className="h-36 w-full rounded-2xl object-cover" />
+      ) : shop.promo_video_url ? (
+        <video src={shop.promo_video_url} className="h-52 w-full rounded-3xl bg-ink object-cover" controls playsInline />
       ) : null}
+      <div className="-mt-10 flex items-end gap-3 px-1">
+        {shop.avatar_url ? (
+          <img src={shop.avatar_url} alt="" className="size-20 rounded-full border-4 border-bg object-cover" />
+        ) : (
+          <div className="flex size-20 items-center justify-center rounded-full border-4 border-bg bg-sand text-primary">
+            <Store className="size-7" />
+          </div>
+        )}
+        <div className="pb-1">
+          <h2 className="text-xl font-extrabold">{shop.title}</h2>
+          <p className="text-sm text-muted-foreground">{shop.merchant_name}</p>
+        </div>
+      </div>
       <div>
-        <h2 className="text-xl font-extrabold">{shop.title}</h2>
-        <p className="text-sm text-muted-foreground">{shop.merchant_name}</p>
-        <a href={`tel:${shop.merchant_phone}`} className="mt-2 inline-flex items-center gap-2 font-extrabold text-primary">
-          <Phone className="size-4" />
-          {shop.merchant_phone}
-        </a>
+        {publicPhone(shop) ? (
+          <a href={`tel:${publicPhone(shop)}`} className="inline-flex items-center gap-2 font-extrabold text-primary">
+            <Phone className="size-4" />
+            {publicPhone(shop)}
+          </a>
+        ) : null}
+        {shop.bio ? <p className="mt-2 text-sm text-muted-foreground">{shop.bio}</p> : null}
         {!owner && me ? (
           <Button className="mt-3" variant={following ? "secondary" : "default"} onClick={() => followMerchant(shopFollowKey)}>
             {following ? "إلغاء المتابعة" : "متابعة التاجر"}
@@ -381,8 +455,14 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
                 },
               });
               if (res.ok) {
+                const ref = cartRefFor(shop.id);
+                const lines = picked.map((p) => `${p.title} × ${p.qty}`).join("\n");
+                sendShopCart(
+                  shop.user_id || shop.id,
+                  `حجز سلة ${ref}\nالاسم: ${me.name}\nالجوال: ${me.phone || publicPhone(shop)}\n${lines}\nالاستلام: ${pickup}`,
+                );
                 setCart({});
-                setToast("الطلب وصل للتاجر");
+                setToast(`الطلب ${ref} وصل للتاجر`);
               }
             }}
           >
