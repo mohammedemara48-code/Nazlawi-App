@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Store, UserRound } from "lucide-react";
-import { useNazlawi } from "@/lib/nazlawi/store";
+import { isAdminEmail, useNazlawi } from "@/lib/nazlawi/store";
 import { COUNTRIES, firebaseError, signInWithGmail, toE164 } from "@/lib/nazlawi/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +9,11 @@ import { registerNazlawiWorker } from "@/lib/nazlawi/push-client";
 import type { VillageUser } from "@/lib/nazlawi/types";
 
 function needsProfile(user: VillageUser) {
+  if (user.role === "admin" || isAdminEmail(user.email)) return false;
   const emailName = user.email.split("@")[0] || "";
   const name = user.name.trim();
   if (!name || name === emailName) return true;
-  if (!user.phone.trim()) return true;
+  if (user.role === "merchant" && !user.phone.trim()) return true;
   return false;
 }
 
@@ -176,18 +177,17 @@ function ProfileSetup({ user }: { user: VillageUser }) {
 
   function save() {
     const fullName = name.trim();
-    const tel = toE164(dial, phone);
     if (fullName.length < 2) {
       setToast("اكتب الاسم");
       return;
     }
-    if (phone.replace(/\D/g, "").length < 7) {
-      setToast("اكتب رقم الجوال");
+    if (user.role === "merchant" && phone.replace(/\D/g, "").length < 7) {
+      setToast("التاجر لازم يكتب رقم الجوال");
       return;
     }
     updateMe({
       name: fullName,
-      phone: tel,
+      phone: user.role === "merchant" ? toE164(dial, phone) : user.phone,
       neighborhood: neighborhood.trim() || "النزل",
       bio: bio.trim(),
     });
@@ -195,28 +195,32 @@ function ProfileSetup({ user }: { user: VillageUser }) {
 
   return (
     <section className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg px-6 pb-8 pt-[max(2.5rem,env(safe-area-inset-top))]">
-      <p className="text-sm text-muted">حساب جديد</p>
-      <h1 className="text-3xl font-extrabold">بيانات النزلاوي</h1>
+      <p className="text-sm text-muted">{user.role === "merchant" ? "حساب تاجر" : "حساب نزلاوي"}</p>
+      <h1 className="text-3xl font-extrabold">{user.role === "merchant" ? "بيانات المتجر" : "اسم النزلاوي"}</h1>
       <p className="mt-1 text-sm text-muted">{user.email}</p>
       <div className="mt-6 flex flex-col gap-3">
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم" />
-        <div className="flex gap-2">
-          <select
-            value={dial}
-            onChange={(e) => setDial(e.target.value)}
-            className="h-10 rounded-md border bg-card px-2 text-sm"
-            aria-label="مفتاح الدولة"
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.iso} value={c.dial}>
-                {c.name} {c.dial}
-              </option>
-            ))}
-          </select>
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="رقم الجوال" />
-        </div>
+        {user.role === "merchant" ? (
+          <div className="flex gap-2">
+            <select
+              value={dial}
+              onChange={(e) => setDial(e.target.value)}
+              className="h-10 rounded-md border bg-card px-2 text-sm"
+              aria-label="مفتاح الدولة"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.iso} value={c.dial}>
+                  {c.name} {c.dial}
+                </option>
+              ))}
+            </select>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="رقم جوال المتجر" />
+          </div>
+        ) : null}
         <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} placeholder="الحي / القرية" />
-        <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="نبذة مختصرة" />
+        {user.role === "merchant" ? (
+          <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="نبذة عن المتجر" />
+        ) : null}
         <Button type="button" size="lg" onClick={save}>
           حفظ ودخول
         </Button>

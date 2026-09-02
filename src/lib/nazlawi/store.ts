@@ -624,7 +624,7 @@ export const useNazlawi = create<NazlawiState>()(
       setToast: (msg) => set({ toast: msg }),
     }),
     {
-      name: "nazlawi-v6",
+      name: "nazlawi-v7",
       skipHydration: true,
       partialize: (s) => ({
         users: s.users,
