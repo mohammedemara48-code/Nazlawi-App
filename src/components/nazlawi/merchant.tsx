@@ -92,23 +92,28 @@ export function MerchantDashboard({
           {orders.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">مفيش حجوزات</p>
           ) : null}
-          {orders.map((order) => (
+          {orders.map((order) => {
+            const lines = items.filter((i) => i.order_id === order.id);
+            const total = lines.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+            const badge =
+              order.status === "completed" ? "مكتمل" : order.status === "rejected" ? "مرفوض" : order.status === "pending" ? "جديد" : "مؤكد";
+            return (
             <Card key={order.id} className="space-y-2 p-4">
               <div className="flex items-center justify-between">
                 <p className="font-extrabold">{order.buyer_name}</p>
-                <span className="text-xs font-bold text-primary">#{order.id.slice(0, 8)}</span>
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold">{badge}</span>
               </div>
+              <p className="text-sm font-bold">رقم الطلب #{order.id.slice(0, 8).toUpperCase()}</p>
               <p className="text-sm" dir="ltr">
                 {order.buyer_phone}
               </p>
               <p className="text-sm text-muted-foreground">الاستلام: {order.pickup_at.replace("T", " ")}</p>
-              {items
-                .filter((i) => i.order_id === order.id)
-                .map((i) => (
+              {lines.map((i) => (
                   <p key={i.id} className="text-sm">
                     {i.title} × {i.qty}
                   </p>
                 ))}
+              <p className="font-extrabold text-primary">الإجمالي {total} ج</p>
               <div className="flex flex-wrap gap-2">
                 {STATUSES.map((s) => (
                   <Button
@@ -125,7 +130,8 @@ export function MerchantDashboard({
                 ))}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -292,17 +298,15 @@ export function MerchantDashboard({
               {categories.map((c) => (
                 <button
                   key={c.id}
-                  className={`flex min-w-20 flex-col items-center gap-1 rounded-2xl px-2 py-2 ${
-                    openCat === c.id ? "bg-primary text-primary-foreground" : "bg-secondary"
-                  }`}
+                  className={`min-w-36 overflow-hidden rounded-2xl ${openCat === c.id ? "ring-2 ring-primary" : ""}`}
                   onClick={() => setOpenCat(c.id)}
                 >
                   {c.icon_url ? (
-                    <img src={c.icon_url} alt="" className="size-12 rounded-xl object-cover" />
+                    <img src={c.icon_url} alt="" className="h-24 w-36 object-cover" />
                   ) : (
-                    <div className="size-12 rounded-xl bg-card" />
+                    <div className="flex h-24 w-36 items-center justify-center bg-secondary text-sm">بدون صورة</div>
                   )}
-                  <span className="text-xs font-bold">{c.title}</span>
+                  <span className="block px-2 py-1 text-xs font-extrabold">{c.title}</span>
                 </button>
               ))}
             </div>

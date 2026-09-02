@@ -122,64 +122,64 @@ export function MarketScreen() {
   if (shopId) return <ShopPage shopId={shopId} onBack={() => setShopId(null)} />;
 
   return (
-    <div className="flex flex-col gap-3">
-      {feed.map((post) => {
-        const key = post.shop?.user_id || post.shop?.merchant_phone || "";
-        const following = Boolean(me && key && follows.some((f) => f.followerId === me.id && f.merchantKey === key));
-        const photos = post.photos?.length ? post.photos : post.photo_url ? [post.photo_url] : [];
-        return (
-          <div key={post.id} className="overflow-hidden rounded-2xl bg-card text-right shadow-sm">
-            <div className="flex items-center justify-between px-4 pt-3">
-              <button className="font-extrabold" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
-                {post.shop?.title ?? "المتجر"}
-              </button>
-              {me && key ? (
-                <Button
-                  size="sm"
-                  variant={following ? "secondary" : "default"}
-                  onClick={() => followMerchant(key)}
-                >
-                  {following ? "متابعة" : "اهتمام بالمتجر"}
-                </Button>
-              ) : null}
-            </div>
-            <button className="w-full text-right" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
-              {post.video_url ? (
-                <video src={post.video_url} className="h-44 w-full object-cover" muted playsInline controls />
-              ) : (
-                <ImageSlider photos={photos} />
-              )}
-              <div className="p-4">
-                <p className="font-extrabold">{post.title}</p>
-                <p className="text-sm text-muted-foreground">{post.body || post.shop?.bio}</p>
+    <div className="flex flex-col gap-4">
+      {shops.flatMap((shop) => {
+        const posts = feed.filter((p) => p.shop_id === shop.id && p.kind !== "deal").slice(0, 3);
+        const promos = feed.filter((p) => p.shop_id === shop.id && p.kind === "deal").slice(0, 2);
+        return [
+          <article key={shop.id} className="overflow-hidden rounded-3xl bg-card shadow-sm">
+            <button className="w-full text-right" onClick={() => setShopId(shop.id)}>
+              <div className="relative">
+                {shop.cover_url ? (
+                  <img src={shop.cover_url} alt="" className="h-32 w-full object-cover" />
+                ) : (
+                  <div className="h-32 bg-sand" />
+                )}
+                <div className="absolute inset-x-0 -bottom-8 flex items-end gap-3 px-4">
+                  {shop.avatar_url ? (
+                    <img src={shop.avatar_url} alt="" className="size-16 rounded-full border-4 border-card object-cover" />
+                  ) : (
+                    <div className="flex size-16 items-center justify-center rounded-full border-4 border-card bg-secondary text-primary">
+                      <Store className="size-6" />
+                    </div>
+                  )}
+                  <div className="pb-1">
+                    <p className="font-extrabold">{shop.title}</p>
+                    <p className="text-xs text-muted-foreground" dir="ltr">
+                      {publicPhone(shop) || shop.id.slice(0, 8)}
+                    </p>
+                  </div>
+                </div>
               </div>
+              <div className="h-10" />
             </button>
-          </div>
-        );
+            {promos.length ? (
+              <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+                {promos.map((p) => (
+                  <button key={p.id} className="overflow-hidden rounded-xl bg-secondary text-right" onClick={() => setShopId(shop.id)}>
+                    {p.photo_url ? <img src={p.photo_url} alt="" className="h-20 w-full object-cover" /> : null}
+                    <p className="px-2 py-1 text-xs font-extrabold">ترويج · {p.title}</p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {posts.map((p) => (
+              <button key={p.id} className="w-full border-t border-border text-right" onClick={() => setShopId(shop.id)}>
+                {p.video_url ? (
+                  <video src={p.video_url} className="h-36 w-full object-cover" muted playsInline controls />
+                ) : p.photos?.[0] || p.photo_url ? (
+                  <img src={p.photos?.[0] || p.photo_url || ""} alt="" className="h-36 w-full object-cover" />
+                ) : null}
+                <div className="px-4 py-3">
+                  <p className="font-extrabold">{p.title}</p>
+                  {p.body ? <p className="text-sm text-muted-foreground">{p.body}</p> : null}
+                </div>
+              </button>
+            ))}
+          </article>,
+        ];
       })}
-
-      {shops.map((shop) => (
-        <button
-          key={shop.id}
-          className="overflow-hidden rounded-2xl bg-card text-right shadow-sm"
-          onClick={() => setShopId(shop.id)}
-        >
-          {shop.cover_url ? (
-            <img src={shop.cover_url} alt="" className="h-28 w-full object-cover" />
-          ) : (
-            <div className="flex h-20 items-center justify-center bg-sand text-primary">
-              <Store className="size-8" />
-            </div>
-          )}
-          <div className="p-4">
-            <p className="font-extrabold">{shop.title}</p>
-            <p className="text-sm text-muted-foreground">{shop.merchant_name}</p>
-          </div>
-        </button>
-      ))}
-      {shops.length === 0 && feed.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground">السوق فاضي</p>
-      ) : null}
+      {shops.length === 0 ? <p className="text-center text-sm text-muted-foreground">السوق فاضي</p> : null}
     </div>
   );
 }
@@ -312,114 +312,58 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
       ) : null}
 
       {categories.length ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <Button size="sm" variant={filter ? "secondary" : "default"} onClick={() => setFilter("")}>
-            الكل
-          </Button>
-          {categories.map((c) => (
-            <Button
-              key={c.id}
-              size="sm"
-              variant={filter === c.id ? "default" : "secondary"}
-              onClick={() => setFilter(c.id)}
-            >
-              {c.title}
-            </Button>
-          ))}
+        <div className="flex flex-col gap-5">
+          {categories.map((c) => {
+            const items = products.filter((p) => p.category_id === c.id);
+            return (
+              <section key={c.id} className="overflow-hidden rounded-3xl bg-card shadow-sm">
+                {c.icon_url ? <img src={c.icon_url} alt="" className="h-36 w-full object-cover" /> : null}
+                <div className="px-4 py-3">
+                  <h3 className="text-lg font-extrabold">{c.title}</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+                  {items.map((p) => (
+                    <Card key={p.id} className="overflow-hidden p-0">
+                      {p.photo_url ? <img src={p.photo_url} alt="" className="h-24 w-full object-cover" /> : null}
+                      <div className="p-2">
+                        <p className="truncate text-sm font-extrabold">{p.title}</p>
+                        <p className="text-sm font-extrabold text-primary">{Number(p.price)} ج</p>
+                        {me && !manage ? (
+                          <Button
+                            size="sm"
+                            className="mt-2 w-full"
+                            onClick={() => setCart((x) => ({ ...x, [p.id]: (x[p.id] ?? 0) + 1 }))}
+                          >
+                            حجز {(cart[p.id] ?? 0) || ""}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
-      ) : null}
-
-      {visible.map((p) => (
-        <Card key={p.id} className="p-3">
-          <div className="flex gap-3">
-            {p.photo_url ? (
-              <img src={p.photo_url} alt="" className="size-20 rounded-lg object-cover" />
-            ) : (
-              <div className="flex size-20 items-center justify-center rounded-lg bg-sand text-primary">
-                <ShoppingBasket className="size-6" />
+      ) : (
+        visible.map((p) => (
+          <Card key={p.id} className="p-3">
+            <div className="flex gap-3">
+              {p.photo_url ? (
+                <img src={p.photo_url} alt="" className="size-20 rounded-lg object-cover" />
+              ) : (
+                <div className="flex size-20 items-center justify-center rounded-lg bg-sand text-primary">
+                  <ShoppingBasket className="size-6" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-extrabold">{p.title}</p>
+                <p className="font-extrabold text-primary">{Number(p.price)} ج</p>
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="font-extrabold">{p.title}</p>
-              <p className="text-sm text-muted-foreground">{p.description}</p>
-              <p className="font-extrabold text-primary">{Number(p.price)} ج</p>
-              <p className="text-xs text-muted-foreground">المتوفر {p.qty ?? 0}</p>
             </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setCart((c) => ({ ...c, [p.id]: Math.max(0, (c[p.id] ?? 0) - 1) }))}
-            >
-              −
-            </Button>
-            <span className="w-6 text-center font-extrabold">{cart[p.id] ?? 0}</span>
-            <Button size="sm" onClick={() => setCart((c) => ({ ...c, [p.id]: (c[p.id] ?? 0) + 1 }))}>
-              +
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() =>
-                addToCart({
-                  productId: p.id,
-                  shopId: shop.id,
-                  title: p.title,
-                  price: Number(p.price),
-                  photo: p.photo_url ?? undefined,
-                })
-              }
-            >
-              العربة
-            </Button>
-            {manage ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="mr-auto"
-                onClick={async () => {
-                  await deleteShopProduct({ data: { productId: p.id, phone: key } });
-                  setToast("تم الحذف");
-                  void reload(0);
-                }}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            ) : null}
-          </div>
-          <div className="mt-3 space-y-1">
-            {comments
-              .filter((c) => c.product_id === p.id)
-              .map((c) => (
-                <p key={c.id} className="text-sm">
-                  <span className="font-extrabold">{c.author_name}</span> {c.text}
-                </p>
-              ))}
-            <form
-              className="flex gap-2"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                await addProductComment({
-                  data: {
-                    productId: p.id,
-                    authorName: me?.name ?? "نزلاوي",
-                    text: String(fd.get("c") ?? ""),
-                  },
-                });
-                e.currentTarget.reset();
-                void reload(offset);
-              }}
-            >
-              <Input name="c" placeholder="تعليق" className="h-9" />
-              <Button type="submit" size="sm">
-                نشر
-              </Button>
-            </form>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        ))
+      )}
 
       {hasMore ? (
         <Button variant="secondary" onClick={() => void reload(offset + PRODUCT_PAGE)}>

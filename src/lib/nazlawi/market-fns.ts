@@ -293,6 +293,7 @@ export const addShopOffer = createServerFn({ method: "POST" })
       const db = await loadMarket();
       const shop = db.shops.find((s) => s.id === data.shopId);
       if (!canManage(shop, data.phone)) return { ok: false as const };
+      if (db.offers.filter((o) => o.shop_id === shop!.id).length >= 2) return { ok: false as const, error: "limit2" };
       const photo = data.photoUrl ? String(data.photoUrl).slice(0, 2000) : "";
       db.offers.unshift({
         id: nid(),
@@ -376,6 +377,10 @@ export const addShopFeed = createServerFn({ method: "POST" })
       if (!canManage(shop, data.phone)) return { ok: false as const };
       const photos = (data.photos ?? []).filter(Boolean).slice(0, 3);
       if (data.photoUrl && photos.length < 3) photos.push(String(data.photoUrl));
+      const kind = data.kind === "deal" ? "deal" : "market";
+      const existing = db.feed.filter((f) => f.shop_id === shop!.id && f.kind === kind).length;
+      if (kind === "market" && existing >= 3) return { ok: false as const, error: "limit3" };
+      if (kind === "deal" && existing >= 2) return { ok: false as const, error: "limit2" };
       db.feed.unshift({
         id: nid(),
         shop_id: shop!.id,
