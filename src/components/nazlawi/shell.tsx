@@ -39,19 +39,11 @@ import {
 import { enableVillagePush } from "@/lib/nazlawi/push-client";
 
 const NAV: { id: ScreenId; title: string }[] = [
-  { id: "home", title: "الرئيسية" },
-  { id: "categories", title: "الفئات" },
+  { id: "market", title: "السوق" },
   { id: "offers", title: "العروض" },
-  { id: "market", title: "سوق النزل" },
-  { id: "timeline", title: "قريتي" },
-  { id: "carpool", title: "خدني معاك" },
-  { id: "delivery", title: "توصيل نزلاوي" },
-  { id: "transport", title: "مواقف ونقل" },
-  { id: "services", title: "دليل الخدمات" },
-  { id: "people", title: "المشتركين" },
-  { id: "chat", title: "محادثة" },
-  { id: "profile", title: "الحساب" },
   { id: "cart", title: "العربة" },
+  { id: "profile", title: "الحساب" },
+  { id: "chat", title: "محادثة" },
   { id: "admin", title: "لوحة الإدارة" },
 ];
 
@@ -73,19 +65,17 @@ const ICONS: Record<ScreenId, typeof UserRound> = {
 };
 
 const CONSUMER_TAB: { id: ScreenId; title: string }[] = [
-  { id: "home", title: "الرئيسية" },
-  { id: "categories", title: "الفئات" },
-  { id: "offers", title: "عروض" },
-  { id: "profile", title: "الحساب" },
+  { id: "market", title: "السوق" },
+  { id: "offers", title: "العروض" },
   { id: "cart", title: "العربة" },
+  { id: "profile", title: "الحساب" },
 ];
 
 const MERCHANT_TAB: { id: ScreenId; title: string }[] = [
   { id: "market", title: "متجري" },
-  { id: "timeline", title: "قريتي" },
-  { id: "offers", title: "عروض" },
+  { id: "offers", title: "العروض" },
   { id: "profile", title: "الحساب" },
-  { id: "people", title: "المشتركين" },
+  { id: "chat", title: "محادثة" },
 ];
 
 type ComposeKind = "post" | "product" | "carpool" | "ride" | "service";
@@ -112,8 +102,8 @@ export function Shell() {
     screen !== "offers";
 
   useEffect(() => {
-    if (user && !canEnter(role, screen)) setScreen(role === "merchant" ? "market" : "home");
-    if (user && role === "merchant" && (screen === "home" || screen === "cart" || screen === "categories")) {
+    if (user && !canEnter(role, screen)) setScreen(role === "merchant" ? "market" : "market");
+    if (user && (screen === "home" || screen === "categories" || screen === "timeline" || screen === "carpool" || screen === "delivery" || screen === "transport" || screen === "services" || screen === "people")) {
       setScreen("market");
     }
   }, [user, role, screen, setScreen]);
