@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { listDealFeed, listMarketFeed, listShops, type ShopRow } from "@/lib/nazlawi/market-fns";
+import { listAllOffers, listMarketFeed, listShops, type ShopRow } from "@/lib/nazlawi/market-fns";
 import { useNazlawi } from "@/lib/nazlawi/store";
 import type { ScreenId } from "@/lib/nazlawi/types";
 
@@ -214,49 +214,30 @@ export function CategoriesScreen() {
 
 export function OffersScreen() {
   const setShopId = useNazlawi((s) => s.setShopId);
-  const followMerchant = useNazlawi((s) => s.followMerchant);
-  const follows = useNazlawi((s) => s.follows);
-  const me = useNazlawi((s) => s.currentUser);
-  const [feed, setFeed] = useState<Awaited<ReturnType<typeof listDealFeed>>>([]);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof listAllOffers>>>([]);
   useEffect(() => {
-    void listDealFeed()
-      .then((rows) => setFeed(rows ?? []))
+    void listAllOffers()
+      .then((list) => setRows(list ?? []))
       .catch(() => undefined);
   }, []);
   return (
     <div className="flex flex-col gap-3">
-      {feed.map((post) => {
-        const key = post.shop?.user_id || post.shop?.merchant_phone || "";
-        const following = Boolean(me && key && follows.some((f) => f.followerId === me.id && f.merchantKey === key));
-        const photos = post.photos?.length ? post.photos : post.photo_url ? [post.photo_url] : [];
-        return (
-          <div key={post.id} className="overflow-hidden rounded-2xl bg-card shadow-sm">
-            <div className="flex items-center justify-between px-4 pt-3">
-              <p className="font-extrabold">{post.shop?.title ?? "المتجر"}</p>
-              {me && key ? (
-                <Button size="sm" variant={following ? "secondary" : "default"} onClick={() => followMerchant(key)}>
-                  {following ? "متابعة" : "اهتمام بالمتجر"}
-                </Button>
-              ) : null}
-            </div>
-            <button className="w-full text-right" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
-              {photos[0] ? <img src={photos[0]} alt="" className="h-40 w-full object-cover" /> : null}
-              {photos.length > 1 ? (
-                <div className="grid grid-cols-2 gap-px">
-                  {photos.slice(1, 3).map((src) => (
-                    <img key={src} src={src} alt="" className="h-24 w-full object-cover" />
-                  ))}
-                </div>
-              ) : null}
-              <div className="p-4">
-                <p className="font-extrabold">{post.title}</p>
-                <p className="text-sm text-muted-foreground">{post.body || post.shop?.bio}</p>
-              </div>
-            </button>
+      {rows.map((offer) => (
+        <button
+          key={offer.id}
+          className="overflow-hidden rounded-2xl bg-card text-right shadow-sm"
+          onClick={() => offer.shop?.id && setShopId(offer.shop.id)}
+        >
+          {offer.photos?.[0] ? <img src={offer.photos[0]} alt="" className="h-40 w-full object-cover" /> : null}
+          <div className="p-4">
+            <p className="text-sm text-primary">{offer.shop?.title}</p>
+            <p className="font-extrabold">{offer.title}</p>
+            {offer.detail ? <p className="text-sm text-muted-foreground">{offer.detail}</p> : null}
+            {offer.price ? <p className="mt-1 font-extrabold text-primary">{offer.price} ج</p> : null}
           </div>
-        );
-      })}
-      {feed.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">مفيش عروض دلوقتي</p> : null}
+        </button>
+      ))}
+      {rows.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">مفيش عروض دلوقتي</p> : null}
     </div>
   );
 }

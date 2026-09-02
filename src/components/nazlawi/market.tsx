@@ -144,7 +144,11 @@ export function MarketScreen() {
               ) : null}
             </div>
             <button className="w-full text-right" onClick={() => post.shop?.id && setShopId(post.shop.id)}>
-              <ImageSlider photos={photos} />
+              {post.video_url ? (
+                <video src={post.video_url} className="h-44 w-full object-cover" muted playsInline controls />
+              ) : (
+                <ImageSlider photos={photos} />
+              )}
               <div className="p-4">
                 <p className="font-extrabold">{post.title}</p>
                 <p className="text-sm text-muted-foreground">{post.body || post.shop?.bio}</p>
@@ -475,6 +479,7 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
         <MerchantDashboard
           shop={shop}
           categories={categories}
+          products={products}
           orders={orders}
           items={orderItems}
           onChanged={() => {

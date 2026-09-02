@@ -264,7 +264,7 @@ export const deleteShopProduct = createServerFn({ method: "POST" })
   });
 
 export const addShopCategory = createServerFn({ method: "POST" })
-  .validator((d: { shopId: string; phone: string; title: string }) => d)
+  .validator((d: { shopId: string; phone: string; title: string; iconUrl?: string }) => d)
   .handler(async ({ data }) => {
     const title = String(data.title ?? "").trim().slice(0, 40);
     if (!title) return { ok: false as const };
@@ -272,7 +272,12 @@ export const addShopCategory = createServerFn({ method: "POST" })
       const db = await loadMarket();
       const shop = db.shops.find((s) => s.id === data.shopId);
       if (!canManage(shop, data.phone)) return { ok: false as const };
-      db.categories.push({ id: nid(), shop_id: shop!.id, title });
+      db.categories.push({
+        id: nid(),
+        shop_id: shop!.id,
+        title,
+        icon_url: data.iconUrl ? String(data.iconUrl).slice(0, 2000) : null,
+      });
       await saveMarket(db);
       return { ok: true as const };
     }
@@ -280,27 +285,37 @@ export const addShopCategory = createServerFn({ method: "POST" })
   });
 
 export const addShopOffer = createServerFn({ method: "POST" })
-  .validator((d: { shopId: string; phone: string; title: string; detail: string }) => d)
+  .validator(
+    (d: { shopId: string; phone: string; title: string; detail: string; price?: number; photoUrl?: string }) => d,
+  )
   .handler(async ({ data }) => {
     if (hasBlob()) {
       const db = await loadMarket();
       const shop = db.shops.find((s) => s.id === data.shopId);
       if (!canManage(shop, data.phone)) return { ok: false as const };
+      const photo = data.photoUrl ? String(data.photoUrl).slice(0, 2000) : "";
       db.offers.unshift({
         id: nid(),
         shop_id: shop!.id,
         title: String(data.title ?? "").slice(0, 80),
         detail: String(data.detail ?? "").slice(0, 240),
-        photos: [],
+        photos: photo ? [photo] : [],
+        price: String(Number(data.price) || 0),
+      });
+      db.feed.unshift({
+        id: nid(),
+        shop_id: shop!.id,
+        title: String(data.title ?? "").slice(0, 80),
+        body: `${String(data.detail ?? "").slice(0, 160)} · ${Number(data.price) || 0} ج`,
+        photo_url: photo || null,
+        photos: photo ? [photo] : [],
+        kind: "deal",
+        video_url: null,
+        created_at: new Date().toISOString(),
       });
       await saveMarket(db);
       return { ok: true as const };
     }
-    const sql = await getSql();
-    const shops = await sql<{ id: string; merchant_phone: string }>`select id, merchant_phone from shops where id = ${data.shopId} limit 1`;
-    const shop = shops[0];
-    if (!shop || shop.merchant_phone !== data.phone) return { ok: false as const };
-    await sql`insert into shop_offers (id, shop_id, title, detail) values (${nid()}, ${shop.id}, ${data.title.slice(0, 80)}, ${data.detail.slice(0, 240)})`;
     return { ok: true as const };
   });
 
@@ -311,14 +326,34 @@ export const setShopPromo = createServerFn({ method: "POST" })
       const db = await loadMarket();
       const shop = db.shops.find((s) => s.id === data.shopId);
       if (!canManage(shop, data.phone)) return { ok: false as const };
-      db.shops = db.shops.map((s) =>
-        s.id === data.shopId ? { ...s, promo_video_url: String(data.videoUrl).slice(0, 2000) } : s,
-      );
+      const video = String(data.videoUrl).slice(0, 2000);
+      db.shops = db.shops.map((s) => (s.id === data.shopId ? { ...s, promo_video_url: video } : s));
+      db.feed = db.feed.filter((f) => !(f.shop_id === shop!.id && f.kind === "video"));
+      db.feed.unshift({
+        id: nid(),
+        shop_id: shop!.id,
+        title: shop!.title,
+        body: shop!.bio || "فيديو المتجر",
+        photo_url: shop!.cover_url,
+        photos: shop!.cover_url ? [shop!.cover_url] : [],
+        kind: "video",
+        video_url: video,
+        created_at: new Date().toISOString(),
+      });
       await saveMarket(db);
       return { ok: true as const };
     }
     return { ok: true as const };
   });
+
+export const listAllOffers = createServerFn({ method: "POST" }).handler(async () => {
+  if (!hasBlob()) return [];
+  const db = await loadMarket();
+  return db.offers.map((row) => ({
+    ...row,
+    shop: db.shops.find((s) => s.id === row.shop_id) ?? null,
+  }));
+});
 
 export const addShopFeed = createServerFn({ method: "POST" })
   .validator(
@@ -349,6 +384,7 @@ export const addShopFeed = createServerFn({ method: "POST" })
         photo_url: photos[0] ?? null,
         photos,
         kind: data.kind === "deal" ? "deal" : "market",
+        video_url: null,
         created_at: new Date().toISOString(),
       });
       await saveMarket(db);

@@ -1,6 +1,6 @@
 import { blobToken } from "./blob";
 
-const PATH = "nazlawi/market-v3.json";
+const PATH = "nazlawi/market-v4.json";
 export const PRODUCT_PAGE = 6;
 
 export type ShopRow = {
@@ -20,6 +20,7 @@ export type CategoryRow = {
   id: string;
   shop_id: string;
   title: string;
+  icon_url: string | null;
 };
 
 export type ProductRow = {
@@ -40,6 +41,7 @@ export type OfferRow = {
   title: string;
   detail: string;
   photos: string[];
+  price: string;
 };
 
 export type FeedRow = {
@@ -49,7 +51,8 @@ export type FeedRow = {
   body: string;
   photo_url: string | null;
   photos: string[];
-  kind: "market" | "deal";
+  kind: "market" | "deal" | "video";
+  video_url: string | null;
   created_at: string;
 };
 
@@ -124,15 +127,16 @@ function hydrate(json: Partial<MarketDB>): MarketDB {
       qty: Number(p.qty ?? 0),
       created_at: p.created_at || new Date().toISOString(),
     })),
-    offers: (json.offers ?? []).map((o) => ({ ...o, photos: o.photos ?? [] })),
+    offers: (json.offers ?? []).map((o) => ({ ...o, photos: o.photos ?? [], price: o.price ?? "" })),
     orders: json.orders ?? [],
     items: json.items ?? [],
     comments: json.comments ?? [],
-    categories: json.categories ?? [],
+    categories: (json.categories ?? []).map((c) => ({ ...c, icon_url: c.icon_url ?? null })),
     feed: (json.feed ?? []).map((f) => ({
       ...f,
       photos: f.photos?.length ? f.photos : f.photo_url ? [f.photo_url] : [],
-      kind: f.kind === "deal" ? "deal" : "market",
+      kind: f.kind === "deal" || f.kind === "video" ? f.kind : "market",
+      video_url: f.video_url ?? null,
     })),
   };
 }
@@ -211,16 +215,16 @@ function seedMarket(): MarketDB {
       { id: "p6", shop_id: "shop-veg", category_id: "c3", title: "خيار", description: "كيلو", price: "5", qty: 70, photo_url: img[1], created_at: now },
     ],
     offers: [
-      { id: "o1", shop_id: "shop-baqala", title: "عرض المؤونة", detail: "أرز + زيت بـ 45", photos: img },
-      { id: "o2", shop_id: "shop-bakery", title: "عيش الصباح", detail: "3 أكياس فينو بـ 20", photos: img },
+      { id: "o1", shop_id: "shop-baqala", title: "عرض المؤونة", detail: "أرز + زيت", photos: img, price: "45" },
+      { id: "o2", shop_id: "shop-bakery", title: "عيش الصباح", detail: "3 أكياس فينو", photos: img, price: "20" },
     ],
     orders: [],
     items: [],
     comments: [],
     categories: [
-      { id: "c1", shop_id: "shop-baqala", title: "مؤونة" },
-      { id: "c2", shop_id: "shop-bakery", title: "مخبوزات" },
-      { id: "c3", shop_id: "shop-veg", title: "خضار" },
+      { id: "c1", shop_id: "shop-baqala", title: "مؤونة", icon_url: img[0] },
+      { id: "c2", shop_id: "shop-bakery", title: "مخبوزات", icon_url: img[1] },
+      { id: "c3", shop_id: "shop-veg", title: "خضار", icon_url: img[2] },
     ],
     feed: [
       {
@@ -231,6 +235,7 @@ function seedMarket(): MarketDB {
         photo_url: img[0],
         photos: img,
         kind: "market",
+        video_url: null,
         created_at: now,
       },
       {
@@ -241,6 +246,7 @@ function seedMarket(): MarketDB {
         photo_url: img[1],
         photos: [img[1], img[0], img[2]],
         kind: "market",
+        video_url: null,
         created_at: now,
       },
       {
@@ -251,6 +257,7 @@ function seedMarket(): MarketDB {
         photo_url: img[2],
         photos: [img[2], img[1], img[0]],
         kind: "market",
+        video_url: null,
         created_at: now,
       },
       {
@@ -261,6 +268,7 @@ function seedMarket(): MarketDB {
         photo_url: img[0],
         photos: img,
         kind: "deal",
+        video_url: null,
         created_at: now,
       },
       {
@@ -271,6 +279,7 @@ function seedMarket(): MarketDB {
         photo_url: img[1],
         photos: [img[1], img[2], img[0]],
         kind: "deal",
+        video_url: null,
         created_at: now,
       },
     ],
