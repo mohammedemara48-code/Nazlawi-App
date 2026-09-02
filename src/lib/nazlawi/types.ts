@@ -43,6 +43,7 @@ export type VillageUser = {
   neighborhood: string;
   showPhone: boolean;
   showDetails: boolean;
+  profileDone?: boolean;
   createdAt: string;
 };
 

@@ -9,6 +9,7 @@ import { registerNazlawiWorker } from "@/lib/nazlawi/push-client";
 import type { VillageUser } from "@/lib/nazlawi/types";
 
 function needsProfile(user: VillageUser) {
+  if (user.profileDone) return false;
   if (user.role === "admin" || isAdminEmail(user.email)) return false;
   const emailName = user.email.split("@")[0] || "";
   const name = user.name.trim();
@@ -169,7 +170,7 @@ function LoginScreen() {
 function ProfileSetup({ user }: { user: VillageUser }) {
   const updateMe = useNazlawi((s) => s.updateMe);
   const setToast = useNazlawi((s) => s.setToast);
-  const [name, setName] = useState(user.name);
+  const [name, setName] = useState(user.name === user.email.split("@")[0] ? "" : user.name);
   const [dial, setDial] = useState("+966");
   const [phone, setPhone] = useState("");
   const [neighborhood, setNeighborhood] = useState(user.neighborhood || "النزل");
@@ -181,6 +182,10 @@ function ProfileSetup({ user }: { user: VillageUser }) {
       setToast("اكتب الاسم");
       return;
     }
+    if (fullName === (user.email.split("@")[0] || "")) {
+      setToast("اكتب الاسم كامل مش الإيميل");
+      return;
+    }
     if (user.role === "merchant" && phone.replace(/\D/g, "").length < 7) {
       setToast("التاجر لازم يكتب رقم الجوال");
       return;
@@ -190,16 +195,17 @@ function ProfileSetup({ user }: { user: VillageUser }) {
       phone: user.role === "merchant" ? toE164(dial, phone) : user.phone,
       neighborhood: neighborhood.trim() || "النزل",
       bio: bio.trim(),
+      profileDone: true,
     });
   }
 
   return (
     <section className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg px-6 pb-8 pt-[max(2.5rem,env(safe-area-inset-top))]">
-      <p className="text-sm text-muted">{user.role === "merchant" ? "حساب تاجر" : "حساب نزلاوي"}</p>
+      <p className="text-sm text-muted-foreground">{user.role === "merchant" ? "حساب تاجر" : "حساب نزلاوي"}</p>
       <h1 className="text-3xl font-extrabold">{user.role === "merchant" ? "بيانات المتجر" : "اسم النزلاوي"}</h1>
-      <p className="mt-1 text-sm text-muted">{user.email}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
       <div className="mt-6 flex flex-col gap-3">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم الكامل" />
         {user.role === "merchant" ? (
           <div className="flex gap-2">
             <select
