@@ -247,6 +247,21 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
 
   if (!shop) return null;
 
+  if (manage) {
+    return (
+      <MerchantDashboard
+        shop={shop}
+        categories={categories}
+        products={products}
+        orders={orders}
+        items={orderItems}
+        onChanged={() => {
+          void reload(0);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="-mx-4 flex flex-col gap-0 pb-8">
       <div className="relative">
@@ -405,21 +420,6 @@ function ShopPage({ shopId, onBack }: { shopId: string; onBack: () => void }) {
             تأكيد الحجز
           </Button>
         </Card>
-      ) : null}
-
-      {manage ? (
-        <div className="px-4">
-          <MerchantDashboard
-            shop={shop}
-            categories={categories}
-            products={products}
-            orders={orders}
-            items={orderItems}
-            onChanged={() => {
-              void reload(0);
-            }}
-          />
-        </div>
       ) : null}
     </div>
   );
