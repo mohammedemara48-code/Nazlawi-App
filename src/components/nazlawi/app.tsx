@@ -132,6 +132,9 @@ function LoginScreen() {
           <Button type="button" size="lg" className="w-full" disabled={busy} onClick={() => void gmail()}>
             الدخول بجيميل
           </Button>
+          <p className="text-center text-xs text-primary-foreground/80" dir="ltr">
+            {typeof window !== "undefined" ? window.location.hostname : ""}
+          </p>
 
           <button type="button" className="text-sm underline" onClick={() => setEmailOpen((v) => !v)}>
             دخول بالإيميل
