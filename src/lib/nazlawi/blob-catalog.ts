@@ -1,6 +1,6 @@
 import { blobToken } from "./blob";
 
-const PATH = "nazlawi/market-v4.json";
+const PATH = "nazlawi/market-v5.json";
 export const PRODUCT_PAGE = 6;
 
 export type ShopRow = {
@@ -143,24 +143,18 @@ function hydrate(json: Partial<MarketDB>): MarketDB {
 
 export async function loadMarket(): Promise<MarketDB> {
   const token = blobToken();
-  if (!token) return seedMarket();
+  if (!token) return empty();
   const { list } = await import("@vercel/blob");
   const { blobs } = await list({ prefix: PATH, token });
   const file = blobs.find((b) => b.pathname === PATH) ?? blobs[0];
   if (!file) {
-    const seeded = seedMarket();
-    await saveMarket(seeded);
-    return seeded;
+    const db = empty();
+    await saveMarket(db);
+    return db;
   }
   const res = await fetch(file.url, { cache: "no-store" });
-  if (!res.ok) return seedMarket();
-  const db = hydrate((await res.json()) as Partial<MarketDB>);
-  if (db.shops.length === 0) {
-    const seeded = seedMarket();
-    await saveMarket(seeded);
-    return seeded;
-  }
-  return db;
+  if (!res.ok) return empty();
+  return hydrate((await res.json()) as Partial<MarketDB>);
 }
 
 function seedMarket(): MarketDB {
