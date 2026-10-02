@@ -10,13 +10,52 @@ import {
   type ConfirmationResult,
 } from "firebase/auth";
 
+/** Prefer Vite names; accept Next-style names already set on Vercel. */
+function env(name: string, nextPublicAlias?: string, fallback = "") {
+  const vite = import.meta.env[name];
+  if (typeof vite === "string" && vite.trim()) return vite.trim();
+  if (nextPublicAlias) {
+    const next = import.meta.env[nextPublicAlias];
+    if (typeof next === "string" && next.trim()) return next.trim();
+  }
+  return fallback;
+}
+
 const config = {
-  apiKey: String(import.meta.env.VITE_FIREBASE_API_KEY ?? "AIzaSyD8UCmGLRTV28msQ8MwC9esh-6PxlKSZqg"),
-  authDomain: String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "nazlawi-app.firebaseapp.com"),
-  projectId: String(import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "nazlawi-app"),
-  storageBucket: String(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "nazlawi-app.firebasestorage.app"),
-  messagingSenderId: String(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "588724293394"),
-  appId: String(import.meta.env.VITE_FIREBASE_APP_ID ?? "1:588724293394:web:15de8bfe95592601a6edcb"),
+  apiKey: String(
+    env("VITE_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY", "AIzaSyD8UCmGLRTV28msQ8MwC9esh-6PxlKSZqg"),
+  ),
+  authDomain: String(
+    env(
+      "VITE_FIREBASE_AUTH_DOMAIN",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+      "nazlawi-app.firebaseapp.com",
+    ),
+  ),
+  projectId: String(
+    env("VITE_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID", "nazlawi-app"),
+  ),
+  storageBucket: String(
+    env(
+      "VITE_FIREBASE_STORAGE_BUCKET",
+      "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+      "nazlawi-app.firebasestorage.app",
+    ),
+  ),
+  messagingSenderId: String(
+    env(
+      "VITE_FIREBASE_MESSAGING_SENDER_ID",
+      "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+      "588724293394",
+    ),
+  ),
+  appId: String(
+    env(
+      "VITE_FIREBASE_APP_ID",
+      "NEXT_PUBLIC_FIREBASE_APP_ID",
+      "1:588724293394:web:15de8bfe95592601a6edcb",
+    ),
+  ),
 };
 
 let recaptcha: RecaptchaVerifier | null = null;
@@ -130,7 +169,7 @@ export function firebaseError(err: unknown) {
   if (code.includes("unauthorized-domain")) return "ضيف الدومين في Authorized domains";
   if (code.includes("operation-not-allowed")) return "اضغط Save في SMS region policy";
   if (msg.includes("already been rendered") || msg.includes("recaptcha")) return "اضغط إرسال الكود مرة كمان";
-  if (code.includes("api-key") || code.includes("invalid-api") || err instanceof Error && err.message === "firebase") {
+  if (code.includes("api-key") || code.includes("invalid-api") || (err instanceof Error && err.message === "firebase")) {
     return "ضيف إعدادات ويب Firebase";
   }
   return err instanceof Error ? err.message : "تعذر التسجيل";
